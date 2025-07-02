@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Page,
   Card,
   BlockStack,
-  Select,
+  TextField,
   Button,
   Spinner,
   EmptyState,
@@ -14,78 +14,152 @@ import {
   Box,
   Divider,
   InlineStack,
+  Tag,
+  FormLayout,
+  Toast,
+  Frame,
 } from "@shopify/polaris";
-import {
-  LayoutBlockIcon,
-  LocationFilledIcon,
-} from "@shopify/polaris-icons";
-import { countryOptions } from "../utils/countryOptions";
+import { LayoutBlockIcon, DeleteIcon, LockIcon } from "@shopify/polaris-icons";
 import { useAppBridge } from "@shopify/app-bridge-react";
 
-export default function CountryBlocker() {
+export default function BlockIPAddresses() {
   const shopify = useAppBridge();
   const shop = shopify.config.shop;
-  const [blockedCountries, setBlockedCountries] = useState([]);
-  const [country, setCountry] = useState("");
+  const [blockedIPs, setBlockedIPs] = useState([]);
+  const [ipAddress, setIpAddress] = useState("");
+  const [ipNote, setIpNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [ipError, setIpError] = useState("");
+  const [toastActive, setToastActive] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
 
   useEffect(() => {
-    fetch("/api/blocked-countries?shop=" + shop)
-      .then((res) => res.json())
-      .then((data) => {
-        setBlockedCountries(data.countries || []);
-        setLoading(false);
-      })
-      .catch(() => {
-        setLoading(false);
-      });
+    fetchBlockedIPs();
   }, [shop]);
 
-  const addCountry = async () => {
-    if (!country) return;
-    
+  const fetchBlockedIPs = async () => {
+    try {
+      const response = await fetch("/api/blocked-ips?shop=" + shop);
+      const data = await response.json();
+      setBlockedIPs(data.ips || []);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching blocked IPs:", error);
+      setLoading(false);
+    }
+  };
+
+  const validateIPAddress = (ip) => {
+    // Basic IP validation (IPv4 and IPv6)
+    const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+    const ipv6Regex = /^([\da-fA-F]{0,4}:){2,7}[\da-fA-F]{0,4}$/;
+
+    if (ipv4Regex.test(ip)) {
+      // For IPv4, check if each octet is valid
+      const parts = ip.split(".");
+      return parts.every(
+        (part) => parseInt(part) >= 0 && parseInt(part) <= 255
+      );
+    }
+
+    return ipv6Regex.test(ip) || ip === "::1";
+  };
+
+  const handleIpChange = useCallback(
+    (value) => {
+      setIpAddress(value);
+      if (ipError && value) {
+        setIpError("");
+      }
+    },
+    [ipError]
+  );
+
+  const addIPAddress = async () => {
+    if (!ipAddress) {
+      setIpError("Please enter an IP address");
+      return;
+    }
+
+    if (!validateIPAddress(ipAddress)) {
+      setIpError("Please enter a valid IP address");
+      return;
+    }
+
+    // Check if IP is already blocked
+    if (blockedIPs.some((ip) => ip.ip_address === ipAddress)) {
+      setIpError("This IP address is already blocked");
+      return;
+    }
+
     setSaving(true);
     try {
-      await fetch("/api/blocked-countries", {
+      const response = await fetch("/api/blocked-ips", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shop: shop, country }),
+        body: JSON.stringify({
+          shop: shop,
+          ip_address: ipAddress,
+          note: ipNote,
+        }),
       });
-      setBlockedCountries([...blockedCountries, country]);
-      setCountry("");
+
+      if (response.ok) {
+        await fetchBlockedIPs(); // Refresh the list
+        setIpAddress("");
+        setIpNote("");
+        showToast("IP address blocked successfully");
+      }
     } catch (error) {
-      console.error("Error adding country:", error);
+      console.error("Error adding IP:", error);
+      showToast("Error blocking IP address");
     } finally {
       setSaving(false);
     }
   };
 
-  const removeCountry = async (code) => {
+  const removeIPAddress = async (ip) => {
     try {
-      await fetch(`/api/blocked-countries/${code}`, {
+      const response = await fetch(`/api/blocked-ips/${ip}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ shop: shop }),
       });
-      setBlockedCountries(blockedCountries.filter((c) => c !== code));
+
+      if (response.ok) {
+        setBlockedIPs(blockedIPs.filter((item) => item.ip_address !== ip));
+        showToast("IP address unblocked");
+      }
     } catch (error) {
-      console.error("Error removing country:", error);
+      console.error("Error removing IP:", error);
+      showToast("Error unblocking IP address");
     }
   };
 
-  const getCountryName = (code) => {
-    const option = countryOptions.find(opt => opt.value === code);
-    return option ? option.label : code;
+  const showToast = (message) => {
+    setToastMessage(message);
+    setToastActive(true);
   };
 
-  const availableCountries = countryOptions.filter(
-    option => !blockedCountries.includes(option.value)
+  const toggleToast = useCallback(
+    () => setToastActive((active) => !active),
+    []
   );
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   if (loading) {
     return (
-      <Page title="Blocked Countries">
+      <Page title="Blocked IP Addresses">
         <Card>
           <div style={{ padding: "40px", textAlign: "center" }}>
             <Spinner size="large" />
@@ -95,156 +169,215 @@ export default function CountryBlocker() {
     );
   }
 
+  const toastMarkup = toastActive ? (
+    <Toast content={toastMessage} onDismiss={toggleToast} />
+  ) : null;
+
   return (
-    <Page
-      title="Blocked Countries"
-      subtitle="Manage countries where you don't want to accept orders"
-    >
-      <Layout>
-        {/* Statistics Banner */}
-        <Layout.Section>
-          <Banner
-            title="Country Blocking Active"
-            tone="info"
-          >
-            <p>
-              You have blocked {blockedCountries.length}{" "}
-              {blockedCountries.length === 1 ? "country" : "countries"} from
-              placing orders in your store.
-            </p>
-          </Banner>
-        </Layout.Section>
+    <Frame>
+      <Page
+        title="Blocked IP Addresses"
+        subtitle="Manage IP addresses that are blocked from accessing your store"
+      >
+        <Layout>
+          {/* Statistics Banner */}
+          <Layout.Section>
+            <Banner title="IP Blocking Active" tone="info">
+              <p>
+                You have blocked {blockedIPs.length}{" "}
+                {blockedIPs.length === 1 ? "IP address" : "IP addresses"} from
+                accessing your store.
+              </p>
+            </Banner>
+          </Layout.Section>
 
-        {/* Add Country Section */}
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <BlockStack gap="200">
-                <Text as="h2" variant="headingMd">Add Blocked Country</Text>
-                <Text variant="bodyMd" tone="subdued">
-                  Select a country to prevent customers from that region from
-                  placing orders
-                </Text>
-              </BlockStack>
-
-              <div style={{ maxWidth: "400px" }}>
-                <InlineStack gap="300">
-                  <InlineStack>
-                    <Select
-                      label="Select country"
-                      labelHidden
-                      options={[
-                        { label: "Choose a country...", value: "" },
-                        ...availableCountries,
-                      ]}
-                      onChange={setCountry}
-                      value={country}
-                      disabled={saving || availableCountries.length === 0}
-                    />
-                  </InlineStack>
-                  <InlineStack>
-                    <Button
-                      variant="primary"
-                      onClick={addCountry}
-                      loading={saving}
-                      disabled={!country || saving}
-                      icon={LayoutBlockIcon}
-                    >
-                      Block Country
-                    </Button>
-                  </InlineStack>
-                </InlineStack>
-              </div>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
-
-        {/* Blocked Countries List */}
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Box
-                paddingBlockStart="400"
-                paddingBlockEnd="400"
-                paddingInlineStart="500"
-                paddingInlineEnd="500"
-              >
+          {/* Add IP Section */}
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400">
                 <BlockStack gap="200">
                   <Text as="h2" variant="headingMd">
-                    Currently Blocked Countries
+                    Block IP Address
                   </Text>
                   <Text variant="bodyMd" tone="subdued">
-                    {blockedCountries.length === 0
-                      ? "No countries are currently blocked"
-                      : `${blockedCountries.length} countries blocked`}
+                    Enter an IP address to prevent access from that location
                   </Text>
                 </BlockStack>
-              </Box>
 
-              <Divider />
+                <FormLayout>
+                  <FormLayout.Group>
+                    <TextField
+                      label="IP Address"
+                      value={ipAddress}
+                      onChange={handleIpChange}
+                      placeholder="e.g., 192.168.1.1"
+                      error={ipError}
+                      autoComplete="off"
+                      monospaced
+                    />
+                    <TextField
+                      label="Note (optional)"
+                      value={ipNote}
+                      onChange={setIpNote}
+                      placeholder="e.g., Spam bot"
+                      autoComplete="off"
+                    />
+                  </FormLayout.Group>
 
-              <Box
-                paddingBlockStart="400"
-                paddingBlockEnd="400"
-                paddingInlineStart="500"
-                paddingInlineEnd="500"
-              >
-                {blockedCountries.length === 0 ? (
-                  <EmptyState
-                    heading="No blocked countries"
-                    image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                  <Button
+                    variant="primary"
+                    onClick={addIPAddress}
+                    loading={saving}
+                    disabled={!ipAddress || saving}
+                    icon={LayoutBlockIcon}
                   >
-                    <p>
-                      Start by searching for countries above to block orders from those regions.
-                    </p>
-                  </EmptyState>
-                ) : (
-                  <Box>
-                    <InlineStack gap="200" wrap>
-                      {blockedCountries.map((code) => (
-                        <Tag
-                          key={code}
-                          onRemove={() => removeCountry(code)}
-                        >
-                          <InlineStack gap="200" blockAlign="center">
-                            <Icon source={LocationFilledIcon} />
-                            <span>{getCountryName(code)}</span>
-                          </InlineStack>
-                        </Tag>
-                      ))}
-                    </InlineStack>
-                  </Box>
-                )}
-              </Box>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
-
-        {/* Information Card */}
-        <Layout.Section>
-          <Card>
-            <Box background="bg-surface-secondary" padding="400">
-              <BlockStack gap="200">
-                <Text as="h3" variant="headingSm">
-                  How country blocking works
-                </Text>
-                <BlockStack gap="200">
-                  <Text as="p" variant="bodyMd" tone="subdued">
-                    • Customers from blocked countries won't be able to complete
-                    checkout
-                  </Text>
-                  <Text as="p" variant="bodyMd" tone="subdued">
-                    • Existing orders from blocked countries remain unaffected
-                  </Text>
-                  <Text as="p" variant="bodyMd" tone="subdued">
-                    • You can unblock countries at any time by clicking Remove
-                  </Text>
-                </BlockStack>
+                    Block IP Address
+                  </Button>
+                </FormLayout>
               </BlockStack>
-            </Box>
-          </Card>
-        </Layout.Section>
-      </Layout>
-    </Page>
+            </Card>
+          </Layout.Section>
+
+          {/* Blocked IPs List */}
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400">
+                <Box
+                  paddingBlockStart="400"
+                  paddingBlockEnd="400"
+                  paddingInlineStart="500"
+                  paddingInlineEnd="500"
+                >
+                  <BlockStack gap="200">
+                    <Text as="h2" variant="headingMd">
+                      Currently Blocked IP Addresses
+                    </Text>
+                    <Text variant="bodyMd" tone="subdued">
+                      {blockedIPs.length === 0
+                        ? "No IP addresses are currently blocked"
+                        : `${blockedIPs.length} IP addresses blocked`}
+                    </Text>
+                  </BlockStack>
+                </Box>
+
+                <Divider />
+
+                <Box
+                  paddingBlockStart="400"
+                  paddingBlockEnd="400"
+                  paddingInlineStart="500"
+                  paddingInlineEnd="500"
+                >
+                  {blockedIPs.length === 0 ? (
+                    <EmptyState
+                      heading="No blocked IP addresses"
+                      image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                    >
+                      <p>
+                        Start by entering an IP address above to block access
+                        from that location.
+                      </p>
+                    </EmptyState>
+                  ) : (
+                    <BlockStack gap="300">
+                      {blockedIPs.map((item, index) => (
+                        <React.Fragment key={item.ip_address}>
+                          <Box>
+                            <InlineStack
+                              align="space-between"
+                              blockAlign="start"
+                            >
+                              <InlineStack gap="400" blockAlign="start">
+                                <div
+                                  style={{
+                                    width: "40px",
+                                    height: "40px",
+                                    borderRadius: "8px",
+                                    backgroundColor: "#f3f4f6",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  <Icon source={LockIcon} tone="base" />
+                                </div>
+                                <BlockStack gap="100">
+                                  <Text
+                                    as="span"
+                                    variant="bodyMd"
+                                    fontWeight="semibold"
+                                  >
+                                    {item.ip_address}
+                                  </Text>
+                                  {item.note && (
+                                    <Text
+                                      as="span"
+                                      variant="bodySm"
+                                      tone="subdued"
+                                    >
+                                      Note: {item.note}
+                                    </Text>
+                                  )}
+                                  <Text
+                                    as="span"
+                                    variant="bodySm"
+                                    tone="subdued"
+                                  >
+                                    Blocked on {formatDate(item.created_at)}
+                                  </Text>
+                                </BlockStack>
+                              </InlineStack>
+
+                              <Button
+                                variant="plain"
+                                tone="critical"
+                                onClick={() => removeIPAddress(item.ip_address)}
+                                icon={DeleteIcon}
+                              >
+                                Remove
+                              </Button>
+                            </InlineStack>
+                          </Box>
+                          {index < blockedIPs.length - 1 && <Divider />}
+                        </React.Fragment>
+                      ))}
+                    </BlockStack>
+                  )}
+                </Box>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+
+          {/* Information Card */}
+          <Layout.Section>
+            <Card>
+              <Box background="bg-surface-secondary" padding="400">
+                <BlockStack gap="200">
+                  <Text as="h3" variant="headingSm">
+                    How IP blocking works
+                  </Text>
+                  <BlockStack gap="200">
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                      • Visitors from blocked IP addresses cannot access your
+                      store
+                    </Text>
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                      • Both IPv4 and IPv6 addresses are supported
+                    </Text>
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                      • You can add notes to remember why an IP was blocked
+                    </Text>
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                      • Blocked IPs can be removed at any time
+                    </Text>
+                  </BlockStack>
+                </BlockStack>
+              </Box>
+            </Card>
+          </Layout.Section>
+        </Layout>
+        {toastMarkup}
+      </Page>
+    </Frame>
   );
 }

@@ -7,10 +7,13 @@ import serveStatic from "serve-static";
 import shopify from "./shopify.js";
 import PrivacyWebhookHandlers from "./privacy.js";
 
-import db from "./db.js";
-import apiRouter from "./routes/api.js";
+import blockedCountriesRouter from "./routes/blockedCountries.js";
+import blockedIpsRouter from "./routes/blockedIps.js";
 import storeRouter from "./routes/store.js";
-import dataRoutes from "./routes/data.js";
+import publicCheckRouter from "./routes/publicCheck.js";
+
+import { ipBlockingMiddleware } from "./middleware/ipBlockingMiddleware.js";
+import db from "./db.js";
 
 const PORT = parseInt(
   process.env.BACKEND_PORT || process.env.PORT || "3000",
@@ -56,9 +59,15 @@ app.use("/data/*", authenticateUser);
 app.use(express.json());
 
 // 👇 mount /apis routes
-app.use("/api", apiRouter);
+app.use("/api", blockedCountriesRouter);
+app.use("/api", blockedIpsRouter);
 app.use("/api/store", storeRouter);
-app.use("/data/info", dataRoutes);
+app.use("/data/info", publicCheckRouter);
+
+// Protected routes - apply IP blocking middleware
+app.get("/shop/*", ipBlockingMiddleware, (req, res) => {
+  // Your shop routes here
+});
 
 // Webhook for uninstall cleanup
 app.post("/api/webhooks/app-uninstalled", async (req, res) => {
