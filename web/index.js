@@ -5,8 +5,12 @@ import express from "express";
 import serveStatic from "serve-static";
 
 import shopify from "./shopify.js";
-import productCreator from "./product-creator.js";
 import PrivacyWebhookHandlers from "./privacy.js";
+
+import db from "./db.js";
+import apiRouter from "./routes/api.js";
+import storeRouter from "./routes/store.js";
+import dataRoutes from "./routes/data.js";
 
 const PORT = parseInt(
   process.env.BACKEND_PORT || process.env.PORT || "3000",
@@ -27,6 +31,7 @@ app.get(
   shopify.auth.callback(),
   shopify.redirectToShopifyOrAppRoot()
 );
+
 app.post(
   shopify.config.webhooks.path,
   shopify.processWebhooks({ webhookHandlers: PrivacyWebhookHandlers })
@@ -35,38 +40,42 @@ app.post(
 // If you are adding routes outside of the /api path, remember to
 // also add a proxy rule for them in web/frontend/vite.config.js
 
+const authenticateUser = async (req, res, next) => {
+  let shop = req.query.shop;
+  let shopStore = await shopify.config.sessionStorage.findSessionsByShop(shop);
+  if (shop === shopStore[0].shop) {
+    next();
+  } else {
+    res.send("User not authenticated");
+  }
+};
+
 app.use("/api/*", shopify.validateAuthenticatedSession());
+app.use("/data/*", authenticateUser);
 
 app.use(express.json());
 
-app.get("/api/products/count", async (_req, res) => {
-  const client = new shopify.api.clients.Graphql({
-    session: res.locals.shopify.session,
-  });
+// 👇 mount /apis routes
+app.use("/api", apiRouter);
+app.use("/api/store", storeRouter);
+app.use("/data/info", dataRoutes);
 
-  const countData = await client.request(`
-    query shopifyProductCount {
-      productsCount {
-        count
-      }
-    }
-  `);
+// Webhook for uninstall cleanup
+app.post("/api/webhooks/app-uninstalled", async (req, res) => {
+  const shop = req.headers["x-shopify-shop-domain"];
+  const client = await db.getClient();
 
-  res.status(200).send({ count: countData.data.productsCount.count });
-});
-
-app.post("/api/products", async (_req, res) => {
-  let status = 200;
-  let error = null;
-
-  try {
-    await productCreator(res.locals.shopify.session);
-  } catch (e) {
-    console.log(`Failed to process products/create: ${e.message}`);
-    status = 500;
-    error = e.message;
+  await client.query("BEGIN");
+  if (shop) {
+    await db.query("DELETE FROM blocked_countries WHERE shop_domain=$1", [
+      shop,
+    ]);
+    await db.query("DELETE FROM shopify_sessions WHERE shop=$1", [shop]);
   }
-  res.status(status).send({ success: status === 200, error });
+  await client.query("COMMIT");
+  client.release();
+  // await client.query("ROLLBACK");
+  res.status(200).send("OK");
 });
 
 app.use(shopify.cspHeaders());

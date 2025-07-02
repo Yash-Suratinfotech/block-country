@@ -1,0 +1,34 @@
+@use "./components/knob";
+@use "./components/setupGuide";
+
+.option-layout {
+  .Polaris-Page--fullWidth {
+    // padding: 0%;
+    .Polaris-Page__Content {
+      // padding: 0%;
+    }
+  }
+  .grid-container {
+    border-radius: 8px;
+    overflow: hidden;
+  }
+}
+
+.Polaris-Popover__Content {
+  max-width: fit-content;
+}
+
+.element-row {
+  .Polaris-Button {
+    .Polaris-Text--root {
+      width: 100%;
+    }
+  }
+}
+
+.blue-button {
+  .Polaris-Button.Polaris-Button {
+    --pc-button-color: var(--p-color-text-link);
+    --pc-button-icon-fill: var(--p-color-text-link);
+  }
+}

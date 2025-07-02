@@ -1,5 +1,4 @@
 import { BrowserRouter } from "react-router-dom";
-import { useTranslation } from "react-i18next";
 import { NavMenu } from "@shopify/app-bridge-react";
 import Routes from "./Routes";
 
@@ -11,7 +10,6 @@ export default function App() {
   const pages = import.meta.glob("./pages/**/!(*.test.[jt]sx)*.([jt]sx)", {
     eager: true,
   });
-  const { t } = useTranslation();
 
   return (
     <PolarisProvider>
@@ -19,7 +17,12 @@ export default function App() {
         <QueryProvider>
           <NavMenu>
             <a href="/" rel="home" />
-            <a href="/pagename">{t("NavigationMenu.pageName")}</a>
+            <a href="/country-blocker" rel="country-blocker">
+              Country Blocker
+            </a>
+            <a href="/ip-blocker" rel="ip-blocker">
+              IP Blocker
+            </a>
           </NavMenu>
           <Routes pages={pages} />
         </QueryProvider>
