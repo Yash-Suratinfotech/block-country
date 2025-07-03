@@ -57,14 +57,24 @@ app.post(
 // also add a proxy rule for them in web/frontend/vite.config.js
 
 const authenticateUser = async (req, res, next) => {
-  let shop = req.query.shop;
-  let shopStore = await shopify.config.sessionStorage.findSessionsByShop(shop);
-  if (shop === shopStore[0].shop) {
+  const shop = req.query.shop;
+
+  // Check if shop parameter exists
+  if (!shop) {
+    return res.status(400).send("Missing shop parameter");
+  }
+
+  // Find session(s) for this shop
+  const shopStore = await shopify.config.sessionStorage.findSessionsByShop(shop);
+
+  // Check if shopStore is an array and has at least one session
+  if (shopStore && shopStore.length > 0 && shop === shopStore[0].shop) {
     next();
   } else {
-    res.send("User not authenticated");
+    res.status(401).send("User not authenticated");
   }
 };
+
 
 app.use("/api/*", shopify.validateAuthenticatedSession());
 app.use("/data/*", authenticateUser);
