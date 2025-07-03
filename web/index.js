@@ -32,7 +32,20 @@ app.get(shopify.config.auth.path, shopify.auth.begin());
 app.get(
   shopify.config.auth.callbackPath,
   shopify.auth.callback(),
-  shopify.redirectToShopifyOrAppRoot()
+  async (req, res, next) => {
+    // You can access the session like this:
+    const session = res.locals.shopify?.session;
+    if (session) {
+      // For debugging/logging
+      console.log("✅ OAuth Callback - Shop authenticated:", session.shop);
+      // Save to your DB if needed, or do post-auth actions
+      // e.g. await db.query(...);
+    } else {
+      console.log("⚠️ No session found in OAuth callback!");
+    }
+    // Then redirect as usual:
+    return shopify.redirectToShopifyOrAppRoot()(req, res, next);
+  }
 );
 
 app.post(
@@ -69,21 +82,13 @@ app.get("/shop/*", ipBlockingMiddleware, (req, res) => {
   // Your shop routes here
 });
 
-// Webhook for uninstall cleanup
+// Webhook for uninstall cleanup (SQLite version)
 app.post("/api/webhooks/app-uninstalled", async (req, res) => {
   const shop = req.headers["x-shopify-shop-domain"];
-  const client = await db.getClient();
-
-  await client.query("BEGIN");
   if (shop) {
-    await db.query("DELETE FROM blocked_countries WHERE shop_domain=$1", [
-      shop,
-    ]);
-    await db.query("DELETE FROM shopify_sessions WHERE shop=$1", [shop]);
+    await db.query("DELETE FROM blocked_countries WHERE shop_domain = ?", [shop]);
+    await db.query("DELETE FROM shopify_sessions WHERE shop = ?", [shop]);
   }
-  await client.query("COMMIT");
-  client.release();
-  // await client.query("ROLLBACK");
   res.status(200).send("OK");
 });
 
