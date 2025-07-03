@@ -6,7 +6,7 @@ import pkg from 'pg';
 const { Pool } = pkg;
 
 // const DATABASE_URL =  process.env.DATABASE_URL;
-const DATABASE_URL =  'postgresql://postgres:I5KNsANROUBfkDWQ@db.iygbzliuvagbjvbrhcka.supabase.co:5432/postgres?sslmode=require';
+const DATABASE_URL =  'postgresql://neondb_owner:npg_aMOn7HEc9qfi@ep-snowy-band-a856xfqa-pooler.eastus2.azure.neon.tech/neondb?sslmode=require&channel_binding=require';
 
 const pool = new Pool({
   connectionString: DATABASE_URL, // adjust as needed
