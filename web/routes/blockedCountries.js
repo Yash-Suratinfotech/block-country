@@ -16,12 +16,12 @@ router.get("/blocked-countries", async (req, res) => {
   await client.query("BEGIN");
 
   const { rows } = await db.query(
-    "SELECT country_code FROM blocked_countries WHERE shop_domain=$1",
+    "SELECT country_code, created_at FROM blocked_countries WHERE shop_domain=$1 ORDER BY created_at DESC",
     [shop]
   );
 
   await client.query("COMMIT");
-  res.json({ countries: rows ? rows.map((r) => r.country_code) : [] });
+  res.json({ countries: rows || [] });
   client.release();
   // await client.query("ROLLBACK");
 });

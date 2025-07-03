@@ -23,6 +23,7 @@ await client.query(`
     id SERIAL PRIMARY KEY,
     shop_domain TEXT,
     country_code VARCHAR(2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT shop_country_unique UNIQUE(shop_domain, country_code)
   );
 

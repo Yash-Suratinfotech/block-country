@@ -22,62 +22,90 @@ export default function HomePage() {
 
   const [loading, setLoading] = useState(true);
   const [storeInfo, setStoreInfo] = useState(null);
-  const [items, setItems] = useState([
-    {
-      id: 0,
-      title: "Block countries",
-      description:
-        "Block countries to prevent customers from purchasing from your store.",
-      image: {
-        url: "https://cdn.shopify.com/shopifycloud/shopify/assets/admin/home/onboarding/shop_pay_task-70830ae12d3f01fed1da23e607dc58bc726325144c29f96c949baca598ee3ef6.svg",
-        alt: "Illustration highlighting Block Country",
-      },
-      complete: false,
-      primaryButton: {
-        content: "Block country",
-        props: {
-          onClick: () => handleAction("/country-blocker"),
-        },
-      },
-      secondaryButton: {
-        content: "View blocked countries",
-        props: {
-          onClick: () => handleAction("/country-blocker"),
-        },
-      },
-    },
-    {
-      id: 1,
-      title: "Block ips",
-      description:
-        "Block ips to prevent customers from purchasing from your store.",
-      complete: false,
-      primaryButton: {
-        content: "Block ip",
-        props: {
-          onClick: () => handleAction("/ip-blocker"),
-        },
-      },
-      secondaryButton: {
-        content: "View blocked ips",
-        props: {
-          onClick: () => handleAction("/ip-blocker"),
-        },
-      },
-    },
-  ]);
+  const [stats, setStats] = useState({
+    blockedCountries: 0,
+    blockedIps: 0,
+    hasBlockedCountries: false,
+    hasBlockedIps: false,
+  });
+
+  const [items, setItems] = useState();
 
   useEffect(() => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    // Update setup guide items based on stats
+    setItems([
+      {
+        id: 0,
+        title: "Block countries",
+        description:
+          "Block countries to prevent customers from purchasing from your store.",
+        image: {
+          url: "https://cdn.shopify.com/shopifycloud/shopify/assets/admin/home/onboarding/shop_pay_task-70830ae12d3f01fed1da23e607dc58bc726325144c29f96c949baca598ee3ef6.svg",
+          alt: "Illustration highlighting Block Country",
+        },
+        complete: stats.hasBlockedCountries,
+        primaryButton: {
+          content: stats.hasBlockedCountries
+            ? "Manage countries"
+            : "Block country",
+          props: {
+            onClick: () => handleAction("/country-blocker"),
+          },
+        },
+        secondaryButton: stats.hasBlockedCountries
+          ? {
+              content: `View ${stats.blockedCountries} blocked ${
+                stats.blockedCountries === 1 ? "country" : "countries"
+              }`,
+              props: {
+                onClick: () => handleAction("/country-blocker"),
+              },
+            }
+          : null,
+      },
+      {
+        id: 1,
+        title: "Block IP addresses",
+        description:
+          "Block IP addresses to prevent specific visitors from accessing your store.",
+        complete: stats.hasBlockedIps,
+        primaryButton: {
+          content: stats.hasBlockedIps ? "Manage IPs" : "Block IP",
+          props: {
+            onClick: () => handleAction("/ip-blocker"),
+          },
+        },
+        secondaryButton: stats.hasBlockedIps
+          ? {
+              content: `View ${stats.blockedIps} blocked ${
+                stats.blockedIps === 1 ? "IP" : "IPs"
+              }`,
+              props: {
+                onClick: () => handleAction("/ip-blocker"),
+              },
+            }
+          : null,
+      },
+    ]);
+  }, [stats]);
+
   const loadData = async () => {
     try {
-      const storeRes = await fetch("/api/store/info");
+      const [storeRes, statsRes] = await Promise.all([
+        fetch("/api/store/info"),
+        fetch("/api/store/stats"),
+      ]);
 
-      if (storeRes.ok) {
+      if (storeRes.ok && statsRes.ok) {
         const storeInfoData = await storeRes.json();
+        const statsData = await statsRes.json();
+
         setStoreInfo(storeInfoData);
+        setStats(statsData);
       }
     } catch (error) {
       shopify.toast.show("There was an error fetching store data", {
@@ -199,8 +227,8 @@ export default function HomePage() {
             onDismiss={() => {}}
           >
             <p>
-              Welcome to <strong>Block Country</strong>, handcrafted by Surat
-              Infotech.
+              Welcome to <strong>Block Country</strong>, handcrafted by Yash
+              Borda.
             </p>
           </Banner>
         </Layout.Section>
@@ -213,8 +241,11 @@ export default function HomePage() {
         {/* Stats Grid */}
         <Layout.Section>
           <InlineGrid columns="2" gap="400">
-            <StatCard title="Blocked countries" value={0} />
-            <StatCard title="Blocked ips" value={0} />
+            <StatCard
+              title="Blocked countries"
+              value={stats.blockedCountries}
+            />
+            <StatCard title="Blocked IP addresses" value={stats.blockedIps} />
           </InlineGrid>
         </Layout.Section>
 
@@ -240,7 +271,9 @@ export default function HomePage() {
                 Our support team is ready to help with our in-app live chat.
               </Text>
               <InlineStack>
-                <Button>Chat with us</Button>
+                <Button url="mailto:yashborda.suratinfotech@gmail.com">
+                  Chat with us
+                </Button>
               </InlineStack>
             </BlockStack>
           </Card>

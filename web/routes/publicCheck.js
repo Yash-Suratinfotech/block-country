@@ -7,8 +7,6 @@ const router = express.Router();
 // Public endpoint for storefront script - Check country
 router.get("/check_country", async (req, res) => {
   const { shop, country } = req.query;
-  // if (key !== process.env.COUNTRY_CHECK_KEY)
-  //   return res.status(401).send("Unauthorized");
 
   if (!shop || !country) {
     return res.status(400).json({ error: "Missing required parameters" });
@@ -36,8 +34,6 @@ router.get("/check_country", async (req, res) => {
 // Public endpoint for storefront script - Check IP
 router.get("/check_ip", async (req, res) => {
   const { shop } = req.query;
-  // if (key !== process.env.IP_CHECK_KEY)
-  //   return res.status(401).send("Unauthorized");
 
   if (!shop) {
     return res.status(400).json({ error: "Missing shop parameter" });

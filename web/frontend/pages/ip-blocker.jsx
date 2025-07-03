@@ -241,7 +241,7 @@ export default function BlockIPAddresses() {
           {/* Blocked IPs List */}
           <Layout.Section>
             <Card>
-              <BlockStack gap="400">
+              <BlockStack>
                 <Box
                   paddingBlockStart="400"
                   paddingBlockEnd="400"

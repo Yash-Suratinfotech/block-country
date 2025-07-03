@@ -37,15 +37,17 @@ export default function BlockCountries() {
   const deselectedOptions = useMemo(() => {
     const options = countryOptions.filter((option) => {
       // Filter out already blocked countries
-      if (blockedCountries.includes(option.value)) return false;
-      
+      if (blockedCountries.some((c) => c.country_code === option.value)) return false;
+
       // Filter based on search input
       if (inputValue === "") return true;
-      
-      return option.label.toLowerCase().includes(inputValue.toLowerCase()) ||
-             option.value.toLowerCase().includes(inputValue.toLowerCase());
+
+      return (
+        option.label.toLowerCase().includes(inputValue.toLowerCase()) ||
+        option.value.toLowerCase().includes(inputValue.toLowerCase())
+      );
     });
-    
+
     return options;
   }, [inputValue, blockedCountries]);
 
@@ -75,16 +77,19 @@ export default function BlockCountries() {
     setSaving(true);
     try {
       // Add multiple countries at once
-      const promises = selectedOptions.map(country => 
+      const promises = selectedOptions.map((country) =>
         fetch("/api/blocked-countries", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ shop: shop, country }),
         })
       );
-      
+
       await Promise.all(promises);
-      setBlockedCountries([...blockedCountries, ...selectedOptions]);
+      // After adding, refetch the list to get created_at
+      const res = await fetch("/api/blocked-countries?shop=" + shop);
+      const data = await res.json();
+      setBlockedCountries(data.countries || []);
       setSelectedOptions([]);
       setInputValue("");
     } catch (error) {
@@ -101,17 +106,20 @@ export default function BlockCountries() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ shop: shop }),
       });
-      setBlockedCountries(blockedCountries.filter((c) => c !== code));
+      setBlockedCountries(blockedCountries.filter((c) => c.country_code !== code));
     } catch (error) {
       console.error("Error removing country:", error);
     }
   };
 
-  const removeFromSelection = useCallback((tag) => {
-    const options = [...selectedOptions];
-    options.splice(options.indexOf(tag), 1);
-    setSelectedOptions(options);
-  }, [selectedOptions]);
+  const removeFromSelection = useCallback(
+    (tag) => {
+      const options = [...selectedOptions];
+      options.splice(options.indexOf(tag), 1);
+      setSelectedOptions(options);
+    },
+    [selectedOptions]
+  );
 
   const getCountryName = (code) => {
     const option = countryOptions.find((opt) => opt.value === code);
@@ -145,6 +153,17 @@ export default function BlockCountries() {
     label: option.label,
   }));
 
+  // Helper to format date
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   if (loading) {
     return (
       <Page title="Blocked Countries">
@@ -161,11 +180,6 @@ export default function BlockCountries() {
     <Page
       title="Blocked Countries"
       subtitle="Manage countries where you don't want to accept orders"
-      primaryAction={{
-        content: "Save",
-        disabled: true,
-        helpText: "Changes are saved automatically",
-      }}
     >
       <Layout>
         {/* Statistics Banner */}
@@ -188,8 +202,8 @@ export default function BlockCountries() {
                   Add Blocked Countries
                 </Text>
                 <Text variant="bodyMd" tone="subdued">
-                  Search and select countries to prevent customers from those regions from
-                  placing orders
+                  Search and select countries to prevent customers from those
+                  regions from placing orders
                 </Text>
               </BlockStack>
 
@@ -201,11 +215,9 @@ export default function BlockCountries() {
                   onSelect={updateSelection}
                   textField={textField}
                 />
-                
+
                 {tagsMarkup && (
-                  <InlineStack gap="200">
-                    {tagsMarkup}
-                  </InlineStack>
+                  <InlineStack gap="200">{tagsMarkup}</InlineStack>
                 )}
 
                 <Box>
@@ -216,7 +228,7 @@ export default function BlockCountries() {
                     disabled={!hasSelectedOptions || saving}
                     fullWidth={false}
                   >
-                    Block {selectedOptions.length > 1 ? 'Countries' : 'Country'}
+                    Block {selectedOptions.length > 1 ? "Countries" : "Country"}
                   </Button>
                 </Box>
               </BlockStack>
@@ -227,8 +239,13 @@ export default function BlockCountries() {
         {/* Blocked Countries List */}
         <Layout.Section>
           <Card>
-            <BlockStack gap="400">
-              <Box paddingBlockStart="400" paddingBlockEnd="400" paddingInlineStart="500" paddingInlineEnd="500">
+            <BlockStack>
+              <Box
+                paddingBlockStart="400"
+                paddingBlockEnd="400"
+                paddingInlineStart="500"
+                paddingInlineEnd="500"
+              >
                 <BlockStack gap="200">
                   <Text as="h2" variant="headingMd">
                     Currently Blocked Countries
@@ -243,7 +260,12 @@ export default function BlockCountries() {
 
               <Divider />
 
-              <Box paddingBlockStart="400" paddingBlockEnd="400" paddingInlineStart="500" paddingInlineEnd="500">
+              <Box
+                paddingBlockStart="400"
+                paddingBlockEnd="400"
+                paddingInlineStart="500"
+                paddingInlineEnd="500"
+              >
                 {blockedCountries.length === 0 ? (
                   <EmptyState
                     heading="No blocked countries"
@@ -256,10 +278,13 @@ export default function BlockCountries() {
                   </EmptyState>
                 ) : (
                   <BlockStack gap="300">
-                    {blockedCountries.map((code, index) => (
-                      <React.Fragment key={code}>
+                    {blockedCountries.map((item, index) => (
+                      <React.Fragment key={item.country_code}>
                         <Box>
-                          <InlineStack align="space-between" blockAlign="center">
+                          <InlineStack
+                            align="space-between"
+                            blockAlign="center"
+                          >
                             <InlineStack gap="400" blockAlign="center">
                               <div
                                 style={{
@@ -275,19 +300,25 @@ export default function BlockCountries() {
                                 <Icon source={LocationFilledIcon} tone="base" />
                               </div>
                               <BlockStack gap="100">
-                                <Text as="span" variant="bodyMd" fontWeight="semibold">
-                                  {getCountryName(code)}
+                                <Text
+                                  as="span"
+                                  variant="bodyMd"
+                                  fontWeight="semibold"
+                                >
+                                  {getCountryName(item.country_code)}
                                 </Text>
                                 <Text as="span" variant="bodySm" tone="subdued">
-                                  Country code: {code}
+                                  Country code: {item.country_code}
+                                </Text>
+                                <Text as="span" variant="bodySm" tone="subdued">
+                                  Blocked on {formatDate(item.created_at)}
                                 </Text>
                               </BlockStack>
                             </InlineStack>
-
                             <Button
                               variant="plain"
                               tone="critical"
-                              onClick={() => removeCountry(code)}
+                              onClick={() => removeCountry(item.country_code)}
                               icon={DeleteIcon}
                             >
                               Remove
@@ -321,7 +352,8 @@ export default function BlockCountries() {
                     • Existing orders from blocked countries remain unaffected
                   </Text>
                   <Text as="p" variant="bodyMd" tone="subdued">
-                    • You can unblock countries at any time by clicking the × on tags
+                    • You can unblock countries at any time by clicking the × on
+                    tags
                   </Text>
                 </BlockStack>
               </BlockStack>

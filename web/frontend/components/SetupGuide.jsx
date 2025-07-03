@@ -53,24 +53,9 @@ export const SetupGuide = ({ items }) => {
           </Text>
           <div style={{ marginTop: ".8rem" }}>
             <InlineStack blockAlign="center" gap="200">
-              {completedItemsLength === items.length ? (
-                <div style={{ maxHeight: "1rem" }}>
-                  <InlineStack wrap={false} gap="100">
-                    <Icon
-                      source={CheckIcon}
-                      tone="subdued"
-                      accessibilityLabel="Check icon to indicate completion of Setup Guide"
-                    />
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Done
-                    </Text>
-                  </InlineStack>
-                </div>
-              ) : (
-                <Text as="span" variant="bodySm">
-                  {`${completedItemsLength} / ${items.length} completed`}
-                </Text>
-              )}
+              <Text as="span" variant="bodySm">
+                {`${completedItemsLength} / ${items.length} completed`}
+              </Text>
 
               {completedItemsLength !== items.length ? (
                 <div style={{ width: "100px" }}>
