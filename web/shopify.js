@@ -39,6 +39,7 @@ const shopify = shopifyApp({
   webhooks: {
     path: "/api/webhooks",
   },
+  hostName: "block-country.onrender.com",
   // This should be replaced with your preferred storage strategy
   sessionStorage: new PostgreSQLSessionStorage(DATABASE_URL),
 });
