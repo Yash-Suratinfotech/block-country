@@ -8,7 +8,7 @@ import { restResources } from "@shopify/shopify-api/rest/admin/2025-04";
 
 // const DATABASE_URL =  process.env.DATABASE_URL;
 const DATABASE_URL =
-  "postgresql://postgres:I5KNsANROUBfkDWQ@db.iygbzliuvagbjvbrhcka.supabase.co:5432/postgres";
+  "postgresql://postgres:I5KNsANROUBfkDWQ@db.iygbzliuvagbjvbrhcka.supabase.co:5432/postgres?sslmode=require";
 
 // The transactions with Shopify will always be marked as test transactions, unless NODE_ENV is production.
 // See the ensureBilling helper to learn more about billing in this template.

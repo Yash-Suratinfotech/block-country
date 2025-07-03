@@ -3,7 +3,7 @@ dotenv.config();
 
 import { Client } from "pg";
 // const DATABASE_URL =  process.env.DATABASE_URL;
-const DATABASE_URL =  'postgresql://postgres:I5KNsANROUBfkDWQ@db.iygbzliuvagbjvbrhcka.supabase.co:5432/postgres';
+const DATABASE_URL =  'postgresql://postgres:I5KNsANROUBfkDWQ@db.iygbzliuvagbjvbrhcka.supabase.co:5432/postgres?sslmode=require';
 
 const client = new Client({
   connectionString: DATABASE_URL,
