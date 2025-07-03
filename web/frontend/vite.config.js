@@ -16,9 +16,14 @@ if (
 
 process.env.VITE_SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
 
+// Fix the proxy target for production
+const backendUrl = process.env.NODE_ENV === "production" 
+  ? "https://block-country.onrender.com"  // Your production URL
+  : `http://127.0.0.1:${process.env.BACKEND_PORT}`;
+
 const proxyOptions = {
-  target: `http://127.0.0.1:${process.env.BACKEND_PORT}`,
-  changeOrigin: false,
+  target: backendUrl,
+  changeOrigin: true,  // Changed to true for production
   secure: true,
   ws: false,
 };
