@@ -352,8 +352,7 @@ export default function BlockCountries() {
                     • Existing orders from blocked countries remain unaffected
                   </Text>
                   <Text as="p" variant="bodyMd" tone="subdued">
-                    • You can unblock countries at any time by clicking the × on
-                    tags
+                    • You can unblock countries at any time
                   </Text>
                 </BlockStack>
               </BlockStack>

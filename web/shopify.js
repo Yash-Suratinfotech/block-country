@@ -28,7 +28,7 @@ const shopify = shopifyApp({
       lineItemBilling: true,
       unstable_managedPricingSupport: true,
     },
-    billing: billingConfig, // or replace with billingConfig above to enable example billing
+    billing: undefined, // or replace with billingConfig above to enable example billing
   },
   auth: {
     path: "/api/auth",
