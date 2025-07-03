@@ -3,11 +3,11 @@
 client_id = "06727b2113c9cc212b445f710bcc3aff"
 name = "Block Country"
 handle = "block-country-1"
-application_url = "https://collectibles-chorus-chance-acquisitions.trycloudflare.com"
+application_url = "https://block-country.onrender.com"
 embedded = true
 
 [build]
-automatically_update_urls_on_dev = true
+automatically_update_urls_on_dev = false
 include_config_on_deploy = true
 
 [webhooks]
@@ -19,13 +19,13 @@ scopes = "read_products,write_products"
 
 [auth]
 redirect_urls = [
-  "https://collectibles-chorus-chance-acquisitions.trycloudflare.com/auth/callback",
-  "https://collectibles-chorus-chance-acquisitions.trycloudflare.com/auth/shopify/callback",
-  "https://collectibles-chorus-chance-acquisitions.trycloudflare.com/api/auth/callback"
+  "https://block-country.onrender.com/auth/callback",
+  "https://block-country.onrender.com/auth/shopify/callback",
+  "https://block-country.onrender.com/api/auth/callback"
 ]
 
 [app_proxy]
-url = "https://collectibles-chorus-chance-acquisitions.trycloudflare.com/data/info"
+url = "https://block-country.onrender.com/data/info"
 subpath = "proxy-1"
 prefix = "apps"
 

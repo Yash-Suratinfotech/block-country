@@ -3,12 +3,15 @@ dotenv.config();
 
 import { BillingInterval, LATEST_API_VERSION } from "@shopify/shopify-api";
 import { shopifyApp } from "@shopify/shopify-app-express";
-import { PostgreSQLSessionStorage } from "@shopify/shopify-app-session-storage-postgresql";
+import { SQLiteSessionStorage } from "@shopify/shopify-app-session-storage-sqlite";
+// import { PostgreSQLSessionStorage } from "@shopify/shopify-app-session-storage-postgresql";
 import { restResources } from "@shopify/shopify-api/rest/admin/2025-04";
 
+const DATABASE_URL =  `${process.cwd()}/database.sqlite`;
 // const DATABASE_URL =  process.env.DATABASE_URL;
-const DATABASE_URL =
-  "postgresql://neondb_owner:npg_aMOn7HEc9qfi@ep-snowy-band-a856xfqa-pooler.eastus2.azure.neon.tech/neondb?sslmode=require&channel_binding=require";
+// const DATABASE_URL =
+//   "postgresql://neondb_owner:npg_aMOn7HEc9qfi@ep-snowy-band-a856xfqa-pooler.eastus2.azure.neon.tech/neondb?sslmode=require";
+
 
 // The transactions with Shopify will always be marked as test transactions, unless NODE_ENV is production.
 // See the ensureBilling helper to learn more about billing in this template.
@@ -41,7 +44,8 @@ const shopify = shopifyApp({
   },
   hostName: "block-country.onrender.com",
   // This should be replaced with your preferred storage strategy
-  sessionStorage: new PostgreSQLSessionStorage(DATABASE_URL),
+  // sessionStorage: new PostgreSQLSessionStorage(DATABASE_URL),
+  sessionStorage: new SQLiteSessionStorage(DATABASE_URL),
 });
 
 export default shopify;

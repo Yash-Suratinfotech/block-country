@@ -1,18 +1,30 @@
 // web/db.js
-import dotenv from "dotenv";
-dotenv.config();
+import sqlite3 from 'sqlite3';
+import { open } from 'sqlite'; // simple async wrapper
 
-import pkg from 'pg';
-const { Pool } = pkg;
-
-// const DATABASE_URL =  process.env.DATABASE_URL;
-const DATABASE_URL =  'postgresql://neondb_owner:npg_aMOn7HEc9qfi@ep-snowy-band-a856xfqa-pooler.eastus2.azure.neon.tech/neondb?sslmode=require&channel_binding=require';
-
-const pool = new Pool({
-  connectionString: DATABASE_URL, // adjust as needed
+// Open and export a singleton db connection
+const dbPromise = open({
+  filename: './database.sqlite',
+  driver: sqlite3.Database
 });
 
+// Helper function for queries (returns all rows)
+async function query(sql, params) {
+  const db = await dbPromise;
+  // If it's a SELECT, use all, otherwise run
+  if (/^\s*select/i.test(sql)) {
+    return db.all(sql, params);
+  } else {
+    return db.run(sql, params);
+  }
+}
+
+// If you want to use transactions or get the db client:
+async function getClient() {
+  return await dbPromise;
+}
+
 export default {
-  query: (text, params) => pool.query(text, params),
-  getClient: () => pool.connect(),
+  query,
+  getClient
 };
