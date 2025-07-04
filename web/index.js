@@ -57,24 +57,35 @@ app.post(
 // also add a proxy rule for them in web/frontend/vite.config.js
 
 const authenticateUser = async (req, res, next) => {
-  const shop = req.query.shop;
+  try {
+    const shop = req.query.shop;
 
-  // Check if shop parameter exists
-  if (!shop) {
-    return res.status(400).send("Missing shop parameter");
-  }
+    if (!shop) {
+      return res.status(400).send("Missing shop parameter");
+    }
 
-  // Find session(s) for this shop
-  const shopStore = await shopify.config.sessionStorage.findSessionsByShop(shop);
+    const sessions = await shopify.config.sessionStorage.findSessionsByShop(
+      shop
+    );
 
-  // Check if shopStore is an array and has at least one session
-  if (shopStore && shopStore.length > 0 && shop === shopStore[0].shop) {
-    next();
-  } else {
+    if (sessions && sessions.length > 0) {
+      // Check if we have a valid session
+      const validSession = sessions.find(
+        (session) => session.shop === shop && session.accessToken
+      );
+
+      if (validSession) {
+        req.shopifySession = validSession;
+        return next();
+      }
+    }
+
     res.status(401).send("User not authenticated");
+  } catch (error) {
+    console.error("Auth error:", error);
+    res.status(500).send("Authentication error");
   }
 };
-
 
 app.use("/api/*", shopify.validateAuthenticatedSession());
 app.use("/data/*", authenticateUser);
@@ -96,7 +107,9 @@ app.get("/shop/*", ipBlockingMiddleware, (req, res) => {
 app.post("/api/webhooks/app-uninstalled", async (req, res) => {
   const shop = req.headers["x-shopify-shop-domain"];
   if (shop) {
-    await db.query("DELETE FROM blocked_countries WHERE shop_domain = ?", [shop]);
+    await db.query("DELETE FROM blocked_countries WHERE shop_domain = ?", [
+      shop,
+    ]);
     await db.query("DELETE FROM shopify_sessions WHERE shop = ?", [shop]);
   }
   res.status(200).send("OK");

@@ -1,20 +1,14 @@
-import dotenv from "dotenv";
-dotenv.config();
-
 import { BillingInterval, LATEST_API_VERSION } from "@shopify/shopify-api";
 import { shopifyApp } from "@shopify/shopify-app-express";
 import { SQLiteSessionStorage } from "@shopify/shopify-app-session-storage-sqlite";
-// import { PostgreSQLSessionStorage } from "@shopify/shopify-app-session-storage-postgresql";
-import { restResources } from "@shopify/shopify-api/rest/admin/2025-04";
+import { restResources } from "@shopify/shopify-api/rest/admin/2025-01";
 
-const DATABASE_URL =  `${process.cwd()}/database.sqlite`;
-// const DATABASE_URL =  process.env.DATABASE_URL;
-// const DATABASE_URL =
-//   "postgresql://neondb_owner:npg_aMOn7HEc9qfi@ep-snowy-band-a856xfqa-pooler.eastus2.azure.neon.tech/neondb?sslmode=require";
+// Use different paths for dev vs production
+const DATABASE_URL =
+  process.env.NODE_ENV === "production"
+    ? "/opt/render/project/src/sessions.sqlite" // Render's persistent directory
+    : "./database.sqlite";
 
-
-// The transactions with Shopify will always be marked as test transactions, unless NODE_ENV is production.
-// See the ensureBilling helper to learn more about billing in this template.
 const billingConfig = {
   "My Shopify One-Time Charge": {
     // This is an example configuration that would do a one-time charge for $2 (only USD is currently supported)
@@ -33,7 +27,7 @@ const shopify = shopifyApp({
       lineItemBilling: true,
       unstable_managedPricingSupport: true,
     },
-    billing: undefined, // or replace with billingConfig above to enable example billing
+    billing: undefined,
   },
   auth: {
     path: "/api/auth",
@@ -42,9 +36,9 @@ const shopify = shopifyApp({
   webhooks: {
     path: "/api/webhooks",
   },
-  hostName: "block-country.onrender.com",
-  // This should be replaced with your preferred storage strategy
-  // sessionStorage: new PostgreSQLSessionStorage(DATABASE_URL),
+  // Use HOST from environment
+  host: process.env.HOST || process.env.SHOPIFY_APP_URL,
+  // Session storage with correct path
   sessionStorage: new SQLiteSessionStorage(DATABASE_URL),
 });
 

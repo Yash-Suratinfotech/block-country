@@ -1,8 +1,14 @@
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
+import sqlite3 from "sqlite3";
+import { open } from "sqlite";
+
+// Use different paths for dev vs production
+const DATABASE_URL =
+  process.env.NODE_ENV === "production"
+    ? "/opt/render/project/src/sessions.sqlite" // Render's persistent directory
+    : "./database.sqlite";
 
 const db = await open({
-  filename: './database.sqlite',
+  filename: DATABASE_URL,
   driver: sqlite3.Database,
 });
 
@@ -37,6 +43,4 @@ await db.exec(`
 `);
 
 await db.close();
-console.log(
-  "✅ Tables initialized (shops, blocked_countries, blocked_ips)."
-);
+console.log("✅ Tables initialized (shops, blocked_countries, blocked_ips).");

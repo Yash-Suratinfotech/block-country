@@ -2,9 +2,15 @@
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite'; // simple async wrapper
 
+// Use different paths for dev vs production
+const DATABASE_URL =
+  process.env.NODE_ENV === "production"
+    ? "/opt/render/project/src/sessions.sqlite" // Render's persistent directory
+    : "./database.sqlite";
+
 // Open and export a singleton db connection
 const dbPromise = open({
-  filename: './database.sqlite',
+  filename: DATABASE_URL,
   driver: sqlite3.Database
 });
 
