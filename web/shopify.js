@@ -1,10 +1,20 @@
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '../.env') }); // path to your root .env
+
 import { BillingInterval, LATEST_API_VERSION } from "@shopify/shopify-api";
 import { shopifyApp } from "@shopify/shopify-app-express";
 import { PostgreSQLSessionStorage } from "@shopify/shopify-app-session-storage-postgresql";
 import { restResources } from "@shopify/shopify-api/rest/admin/2025-04";
 
 // Use different paths for dev vs production
-const DATABASE_URL =  process.env.DATABASE_URL;
+const DATABASE_URL = process.env.DATABASE_URL;
+console.log('✌️DATABASE_URL SHOPIFY --->', DATABASE_URL);
 
 const billingConfig = {
   "My Shopify One-Time Charge": {

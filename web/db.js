@@ -1,15 +1,23 @@
 // web/db.js
 import dotenv from "dotenv";
 dotenv.config();
+import path from "path";
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 import pkg from 'pg';
 const { Pool } = pkg;
 
-// const DATABASE_URL =  process.env.DATABASE_URL;
-const DATABASE_URL =  'postgresql://neondb_owner:npg_aMOn7HEc9qfi@ep-snowy-band-a856xfqa-pooler.eastus2.azure.neon.tech/neondb?sslmode=require&channel_binding=require';
+const DATABASE_URL =  process.env.DATABASE_URL;
+console.log("✌️DATABASE_URL DB --->", DATABASE_URL);
 
 const pool = new Pool({
-  connectionString: DATABASE_URL, // adjust as needed
+  connectionString: DATABASE_URL, 
+  ssl: { rejectUnauthorized: false },
 });
 
 export default {

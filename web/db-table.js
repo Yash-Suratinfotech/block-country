@@ -1,8 +1,16 @@
 import dotenv from "dotenv";
 dotenv.config();
+import path from "path";
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 import { Client } from "pg";
 const DATABASE_URL =  process.env.DATABASE_URL;
+console.log('✌️DATABASE_URL TABLE --->', DATABASE_URL);
 
 const client = new Client({
   connectionString: DATABASE_URL,
