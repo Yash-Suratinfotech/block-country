@@ -43,9 +43,6 @@ await client.query(`
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT shop_ip_unique UNIQUE(shop_domain, ip_address)
   );
-
-  CREATE INDEX idx_blocked_ips_shop_domain ON blocked_ips(shop_domain);
-  CREATE INDEX idx_blocked_ips_ip_address ON blocked_ips(ip_address);
 `);
 
 await client.end();
