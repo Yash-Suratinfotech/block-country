@@ -44,7 +44,7 @@ const shopify = shopifyApp({
     path: "/api/webhooks",
   },
   // Use HOST from environment
-  host: process.env.HOST || process.env.SHOPIFY_APP_URL,
+  host: process.env.HOST,
   // Session storage with correct path
   sessionStorage: new PostgreSQLSessionStorage(DATABASE_URL),
 });
