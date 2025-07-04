@@ -14,6 +14,7 @@ console.log('✌️DATABASE_URL TABLE --->', DATABASE_URL);
 
 const client = new Client({
   connectionString: DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
 });
 
 await client.connect();
