@@ -12,15 +12,22 @@ router.get("/check_country", async (req, res) => {
     return res.status(400).json({ error: "Missing required parameters" });
   }
 
+  const client = await db.getClient();
+
   try {
-    const rows = await db.query(
-      "SELECT 1 FROM blocked_countries WHERE shop_domain=? AND country_code=?",
+    await client.query("BEGIN");
+    const { rowCount } = await db.query(
+      "SELECT 1 FROM blocked_countries WHERE shop_domain=$1 AND country_code=$2",
       [shop, country]
     );
-    res.status(200).json({ blocked: rows.length > 0 });
+    await client.query("COMMIT");
+    res.status(200).json({ blocked: rowCount > 0 });
   } catch (error) {
+    await client.query("ROLLBACK");
     console.error("Error checking country:", error);
     res.status(500).json({ error: "Internal server error" });
+  } finally {
+    client.release();
   }
 });
 
@@ -40,19 +47,27 @@ router.get("/check_ip", async (req, res) => {
     return res.status(400).json({ error: "Could not determine IP address" });
   }
 
+  const client = await db.getClient();
+
   try {
-    const rows = await db.query(
-      "SELECT note FROM blocked_ips WHERE shop_domain=? AND ip_address=? LIMIT 1",
+    await client.query("BEGIN");
+    const { rows } = await db.query(
+      "SELECT note FROM blocked_ips WHERE shop_domain=$1 AND ip_address=$2 LIMIT 1",
       [shop, clientIp]
     );
+    await client.query("COMMIT");
+
     res.status(200).json({
       blocked: rows.length > 0,
-      ip: clientIp,
+      ip: clientIp, // Return the IP for debugging (optional)
       reason: rows.length > 0 ? rows[0].note : null,
     });
   } catch (error) {
+    await client.query("ROLLBACK");
     console.error("Error checking IP:", error);
     res.status(500).json({ error: "Internal server error" });
+  } finally {
+    client.release();
   }
 });
 
@@ -68,15 +83,19 @@ router.get("/check_access", async (req, res) => {
   const rawIp = getClientIp(req);
   const clientIp = normalizeIp(rawIp);
 
+  const client = await db.getClient();
+
   try {
+    await client.query("BEGIN");
+
     // Check country if provided
     let countryBlocked = false;
     if (country) {
       const countryResult = await db.query(
-        "SELECT 1 FROM blocked_countries WHERE shop_domain=? AND country_code=?",
+        "SELECT 1 FROM blocked_countries WHERE shop_domain=$1 AND country_code=$2",
         [shop, country]
       );
-      countryBlocked = countryResult.length > 0;
+      countryBlocked = countryResult.rowCount > 0;
     }
 
     // Check IP
@@ -84,12 +103,14 @@ router.get("/check_access", async (req, res) => {
     let ipBlockReason = null;
     if (clientIp) {
       const ipResult = await db.query(
-        "SELECT note FROM blocked_ips WHERE shop_domain=? AND ip_address=? LIMIT 1",
+        "SELECT note FROM blocked_ips WHERE shop_domain=$1 AND ip_address=$2 LIMIT 1",
         [shop, clientIp]
       );
-      ipBlocked = ipResult.length > 0;
-      ipBlockReason = ipBlocked ? ipResult[0].note : null;
+      ipBlocked = ipResult.rows.length > 0;
+      ipBlockReason = ipBlocked ? ipResult.rows[0].note : null;
     }
+
+    await client.query("COMMIT");
 
     res.status(200).json({
       blocked: countryBlocked || ipBlocked,
@@ -100,8 +121,11 @@ router.get("/check_access", async (req, res) => {
       reason: ipBlockReason,
     });
   } catch (error) {
+    await client.query("ROLLBACK");
     console.error("Error checking access:", error);
     res.status(500).json({ error: "Internal server error" });
+  } finally {
+    client.release();
   }
 });
 

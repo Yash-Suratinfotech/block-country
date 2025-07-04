@@ -103,15 +103,21 @@ app.get("/shop/*", ipBlockingMiddleware, (req, res) => {
   // Your shop routes here
 });
 
-// Webhook for uninstall cleanup (SQLite version)
+// Webhook for uninstall cleanup
 app.post("/api/webhooks/app-uninstalled", async (req, res) => {
   const shop = req.headers["x-shopify-shop-domain"];
+  const client = await db.getClient();
+
+  await client.query("BEGIN");
   if (shop) {
-    await db.query("DELETE FROM blocked_countries WHERE shop_domain = ?", [
+    await db.query("DELETE FROM blocked_countries WHERE shop_domain=$1", [
       shop,
     ]);
-    await db.query("DELETE FROM shopify_sessions WHERE shop = ?", [shop]);
+    await db.query("DELETE FROM shopify_sessions WHERE shop=$1", [shop]);
   }
+  await client.query("COMMIT");
+  client.release();
+  // await client.query("ROLLBACK");
   res.status(200).send("OK");
 });
 

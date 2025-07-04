@@ -1,13 +1,10 @@
 import { BillingInterval, LATEST_API_VERSION } from "@shopify/shopify-api";
 import { shopifyApp } from "@shopify/shopify-app-express";
-import { SQLiteSessionStorage } from "@shopify/shopify-app-session-storage-sqlite";
-import { restResources } from "@shopify/shopify-api/rest/admin/2025-01";
+import { PostgreSQLSessionStorage } from "@shopify/shopify-app-session-storage-postgresql";
+import { restResources } from "@shopify/shopify-api/rest/admin/2025-04";
 
 // Use different paths for dev vs production
-const DATABASE_URL =
-  process.env.NODE_ENV === "production"
-    ? "/opt/render/project/src/sessions.sqlite" // Render's persistent directory
-    : "./database.sqlite";
+const DATABASE_URL =  process.env.DATABASE_URL;
 
 const billingConfig = {
   "My Shopify One-Time Charge": {
@@ -39,7 +36,7 @@ const shopify = shopifyApp({
   // Use HOST from environment
   host: process.env.HOST || process.env.SHOPIFY_APP_URL,
   // Session storage with correct path
-  sessionStorage: new SQLiteSessionStorage(DATABASE_URL),
+  sessionStorage: new PostgreSQLSessionStorage(DATABASE_URL),
 });
 
 export default shopify;

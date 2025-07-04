@@ -1,46 +1,46 @@
-import sqlite3 from "sqlite3";
-import { open } from "sqlite";
+import dotenv from "dotenv";
+dotenv.config();
 
-// Use different paths for dev vs production
-const DATABASE_URL =
-  process.env.NODE_ENV === "production"
-    ? "/opt/render/project/src/sessions.sqlite" // Render's persistent directory
-    : "./database.sqlite";
+import { Client } from "pg";
+const DATABASE_URL =  process.env.DATABASE_URL;
 
-const db = await open({
-  filename: DATABASE_URL,
-  driver: sqlite3.Database,
+const client = new Client({
+  connectionString: DATABASE_URL,
 });
 
-// Table creation for SQLite
-await db.exec(`
+await client.connect();
+
+// Recreate table if needed (does nothing if already exists with right structure)
+await client.query(`
   CREATE TABLE IF NOT EXISTS shops (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     shop_domain TEXT UNIQUE,
     access_token TEXT,
-    installed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    installed_at TIMESTAMP DEFAULT NOW()
   );
 
   CREATE TABLE IF NOT EXISTS blocked_countries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     shop_domain TEXT,
-    country_code TEXT,
+    country_code VARCHAR(2),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(shop_domain, country_code)
+    CONSTRAINT shop_country_unique UNIQUE(shop_domain, country_code)
   );
 
   CREATE TABLE IF NOT EXISTS blocked_ips (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     shop_domain TEXT,
-    ip_address TEXT NOT NULL, -- Supports both IPv4 and IPv6
+    ip_address VARCHAR(45) NOT NULL, -- Supports both IPv4 and IPv6
     note TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(shop_domain, ip_address)
+    CONSTRAINT shop_ip_unique UNIQUE(shop_domain, ip_address)
   );
 
-  CREATE INDEX IF NOT EXISTS idx_blocked_ips_shop_domain ON blocked_ips(shop_domain);
-  CREATE INDEX IF NOT EXISTS idx_blocked_ips_ip_address ON blocked_ips(ip_address);
+  CREATE INDEX idx_blocked_ips_shop_domain ON blocked_ips(shop_domain);
+  CREATE INDEX idx_blocked_ips_ip_address ON blocked_ips(ip_address);
 `);
 
-await db.close();
-console.log("✅ Tables initialized (shops, blocked_countries, blocked_ips).");
+await client.end();
+console.log(
+  "✅ Tables initialized (shops and blocked_countries, no relation)."
+);
