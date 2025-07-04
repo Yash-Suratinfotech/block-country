@@ -1,3 +1,4 @@
+// web/frontend/App.jsx
 import { BrowserRouter } from "react-router-dom";
 import { NavMenu } from "@shopify/app-bridge-react";
 import Routes from "./Routes";
@@ -18,10 +19,19 @@ export default function App() {
           <NavMenu>
             <a href="/" rel="home" />
             <a href="/country-blocker" rel="country-blocker">
-              Country Blocker
+              Country Management
             </a>
             <a href="/ip-blocker" rel="ip-blocker">
-              IP Blocker
+              IP Management
+            </a>
+            <a href="/bot-blocker" rel="bot-blocker">
+              Bot Management
+            </a>
+            <a href="/content-protection" rel="content-protection">
+              Content Protection
+            </a>
+            <a href="/analytics" rel="analytics">
+              Analytics & Insights
             </a>
           </NavMenu>
           <Routes pages={pages} />

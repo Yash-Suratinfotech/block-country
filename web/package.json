@@ -1,13 +1,13 @@
 {
   "name": "shopify-app-template-node",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
     "debug": "node --inspect-brk index.js",
     "db": "node db-table.js",
-    "dev": "node db-table.js && cross-env NODE_ENV=development nodemon index.js --ignore ./frontend",
-    "serve": "node db-table.js && cross-env NODE_ENV=production node index.js",
+    "dev": "cross-env NODE_ENV=development nodemon index.js --ignore ./frontend",
+    "serve": "cross-env NODE_ENV=production node index.js",
     "build": "cd frontend && npm install && npm run build",
     "start": "npm run serve"
   },
