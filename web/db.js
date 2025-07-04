@@ -17,7 +17,6 @@ console.log("✌️DATABASE_URL DB --->", DATABASE_URL);
 
 const pool = new Pool({
   connectionString: DATABASE_URL, 
-  ssl: { rejectUnauthorized: false },
 });
 
 export default {
