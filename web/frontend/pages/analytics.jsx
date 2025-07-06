@@ -1,4 +1,4 @@
-// web/frontend/pages/analytics.jsx
+// web/frontend/pages/analytics.jsx 
 import React, { useEffect, useState, useCallback } from "react";
 import {
   Page,
@@ -16,10 +16,10 @@ import {
   EmptyState,
   Spinner,
   Banner,
+  Button,
+  Tooltip,
 } from "@shopify/polaris";
-import {
-  ExportIcon,
-} from "@shopify/polaris-icons";
+import { ExportIcon, RefreshIcon } from "@shopify/polaris-icons";
 import { useAppBridge } from "@shopify/app-bridge-react";
 
 export default function Analytics() {
@@ -29,12 +29,19 @@ export default function Analytics() {
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState(0);
   const [timeRange, setTimeRange] = useState("7");
+  const [autoRefresh, setAutoRefresh] = useState(false);
 
   // Analytics data
   const [dashboardData, setDashboardData] = useState(null);
   const [visitorsData, setVisitorsData] = useState(null);
   const [blockingData, setBlockingData] = useState(null);
   const [realtimeData, setRealtimeData] = useState(null);
+  const [loadingStates, setLoadingStates] = useState({
+    dashboard: false,
+    visitors: false,
+    blocking: false,
+    realtime: false,
+  });
 
   const tabs = [
     {
@@ -60,6 +67,7 @@ export default function Analytics() {
   ];
 
   const timeRangeOptions = [
+    { label: "Last 24 hours", value: "1" },
     { label: "Last 7 days", value: "7" },
     { label: "Last 30 days", value: "30" },
     { label: "Last 90 days", value: "90" },
@@ -71,50 +79,122 @@ export default function Analytics() {
 
   useEffect(() => {
     // Set up real-time data refresh
-    if (selectedTab === 3) {
-      const interval = setInterval(loadRealtimeData, 30000); // Every 30 seconds
-      loadRealtimeData();
+    if (selectedTab === 3 || autoRefresh) {
+      const interval = setInterval(() => {
+        if (selectedTab === 3) {
+          loadRealtimeData();
+        } else if (autoRefresh) {
+          loadAnalyticsData();
+        }
+      }, 30000); // Every 30 seconds
+
+      if (selectedTab === 3) {
+        loadRealtimeData();
+      }
+
       return () => clearInterval(interval);
     }
-  }, [selectedTab, shop]);
+  }, [selectedTab, shop, autoRefresh]);
 
   const loadAnalyticsData = async () => {
-    setLoading(true);
+    if (selectedTab !== 3) {
+      setLoading(true);
+    }
+
     try {
       const promises = [
-        fetch(`/api/analytics/dashboard?shop=${shop}&days=${timeRange}`),
-        fetch(
-          `/api/analytics/visitors?shop=${shop}&days=${timeRange}&limit=100`
-        ),
-        fetch(`/api/analytics/blocking?shop=${shop}&days=${timeRange}`),
+        loadDashboardData(),
+        loadVisitorsData(),
+        loadBlockingData(),
       ];
 
-      const [dashboardRes, visitorsRes, blockingRes] = await Promise.all(
-        promises
-      );
-
-      if (dashboardRes.ok) {
-        const data = await dashboardRes.json();
-        setDashboardData(data);
-      }
-
-      if (visitorsRes.ok) {
-        const data = await visitorsRes.json();
-        setVisitorsData(data);
-      }
-
-      if (blockingRes.ok) {
-        const data = await blockingRes.json();
-        setBlockingData(data);
-      }
+      await Promise.all(promises);
     } catch (error) {
       console.error("Error loading analytics data:", error);
+      shopify.toast.show("Error loading analytics data", { isError: true });
     } finally {
       setLoading(false);
     }
   };
 
+  const loadDashboardData = async () => {
+    setLoadingStates((prev) => ({ ...prev, dashboard: true }));
+    try {
+      const response = await fetch(
+        `/api/analytics/dashboard?shop=${shop}&days=${timeRange}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+
+        // Fix duration calculations
+        if (data.overview) {
+          data.overview.avg_duration = Math.round(
+            data.overview.avg_duration || 0
+          );
+        }
+
+        // Fix page data duration calculations
+        if (data.topPages) {
+          data.topPages = data.topPages.map((page) => ({
+            ...page,
+            avg_duration: Math.round(page.avg_duration || 0),
+          }));
+        }
+
+        setDashboardData(data);
+      }
+    } catch (error) {
+      console.error("Error loading dashboard data:", error);
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, dashboard: false }));
+    }
+  };
+
+  const loadVisitorsData = async () => {
+    setLoadingStates((prev) => ({ ...prev, visitors: true }));
+    try {
+      const response = await fetch(
+        `/api/analytics/visitors?shop=${shop}&days=${timeRange}&limit=100`
+      );
+      if (response.ok) {
+        const data = await response.json();
+
+        // Fix visitor duration data
+        if (data.visitors) {
+          data.visitors = data.visitors.map((visitor) => ({
+            ...visitor,
+            visit_duration: Math.round(visitor.visit_duration || 0),
+          }));
+        }
+
+        setVisitorsData(data);
+      }
+    } catch (error) {
+      console.error("Error loading visitors data:", error);
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, visitors: false }));
+    }
+  };
+
+  const loadBlockingData = async () => {
+    setLoadingStates((prev) => ({ ...prev, blocking: true }));
+    try {
+      const response = await fetch(
+        `/api/analytics/blocking?shop=${shop}&days=${timeRange}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setBlockingData(data);
+      }
+    } catch (error) {
+      console.error("Error loading blocking data:", error);
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, blocking: false }));
+    }
+  };
+
   const loadRealtimeData = async () => {
+    setLoadingStates((prev) => ({ ...prev, realtime: true }));
     try {
       const response = await fetch(`/api/analytics/realtime?shop=${shop}`);
       if (response.ok) {
@@ -123,6 +203,8 @@ export default function Analytics() {
       }
     } catch (error) {
       console.error("Error loading real-time data:", error);
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, realtime: false }));
     }
   };
 
@@ -133,6 +215,14 @@ export default function Analytics() {
   const handleTimeRangeChange = useCallback((value) => {
     setTimeRange(value);
   }, []);
+
+  const handleRefresh = useCallback(() => {
+    if (selectedTab === 3) {
+      loadRealtimeData();
+    } else {
+      loadAnalyticsData();
+    }
+  }, [selectedTab]);
 
   const exportData = async (format = "csv") => {
     try {
@@ -150,27 +240,44 @@ export default function Analytics() {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
+
+        shopify.toast.show("Analytics data exported successfully");
       }
     } catch (error) {
       console.error("Error exporting data:", error);
+      shopify.toast.show("Error exporting data", { isError: true });
     }
   };
 
   const formatNumber = (num) => {
+    if (typeof num !== "number" || isNaN(num)) return "0";
     if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
     if (num >= 1000) return (num / 1000).toFixed(1) + "K";
-    return num?.toString() || "0";
+    return num.toString();
   };
 
   const formatDuration = (seconds) => {
-    if (!seconds) return "0s";
+    if (!seconds || isNaN(seconds)) return "0s";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   };
 
+  const formatPercentage = (value, total) => {
+    if (!total || total === 0) return "0%";
+    return `${((value / total) * 100).toFixed(1)}%`;
+  };
+
   const renderOverview = () => {
-    if (!dashboardData) return <Spinner size="large" />;
+    if (loadingStates.dashboard || !dashboardData) {
+      return (
+        <div style={{ padding: "40px", textAlign: "center" }}>
+          <Spinner size="large" />
+        </div>
+      );
+    }
+
+    const { overview } = dashboardData;
 
     return (
       <Layout>
@@ -182,10 +289,10 @@ export default function Analytics() {
                   Total Visits
                 </Text>
                 <Text variant="displayLarge">
-                  {formatNumber(dashboardData.overview.total_visits)}
+                  {formatNumber(overview.total_visits || 0)}
                 </Text>
                 <Text variant="bodySm" tone="subdued">
-                  {dashboardData.overview.unique_sessions} unique sessions
+                  {formatNumber(overview.unique_sessions || 0)} unique sessions
                 </Text>
               </BlockStack>
             </Card>
@@ -196,11 +303,10 @@ export default function Analytics() {
                   Unique Visitors
                 </Text>
                 <Text variant="displayLarge">
-                  {formatNumber(dashboardData.overview.unique_visitors)}
+                  {formatNumber(overview.unique_visitors || 0)}
                 </Text>
                 <Text variant="bodySm" tone="subdued">
-                  Avg. duration:{" "}
-                  {formatDuration(dashboardData.overview.avg_duration)}
+                  Avg. duration: {formatDuration(overview.avg_duration)}
                 </Text>
               </BlockStack>
             </Card>
@@ -211,15 +317,11 @@ export default function Analytics() {
                   Bot Visits
                 </Text>
                 <Text variant="displayLarge" tone="warning">
-                  {formatNumber(dashboardData.overview.bot_visits)}
+                  {formatNumber(overview.bot_visits || 0)}
                 </Text>
                 <Text variant="bodySm" tone="subdued">
-                  {(
-                    (dashboardData.overview.bot_visits /
-                      dashboardData.overview.total_visits) *
-                    100
-                  ).toFixed(1)}
-                  % of total
+                  {formatPercentage(overview.bot_visits, overview.total_visits)}{" "}
+                  of total
                 </Text>
               </BlockStack>
             </Card>
@@ -230,15 +332,14 @@ export default function Analytics() {
                   Blocked Visits
                 </Text>
                 <Text variant="displayLarge" tone="critical">
-                  {formatNumber(dashboardData.overview.blocked_visits)}
+                  {formatNumber(overview.blocked_visits || 0)}
                 </Text>
                 <Text variant="bodySm" tone="subdued">
-                  {(
-                    (dashboardData.overview.blocked_visits /
-                      dashboardData.overview.total_visits) *
-                    100
-                  ).toFixed(1)}
-                  % of total
+                  {formatPercentage(
+                    overview.blocked_visits,
+                    overview.total_visits
+                  )}{" "}
+                  of total
                 </Text>
               </BlockStack>
             </Card>
@@ -253,7 +354,8 @@ export default function Analytics() {
                 <Text as="h2" variant="headingMd">
                   Top Countries
                 </Text>
-                {dashboardData.topCountries.length === 0 ? (
+                {!dashboardData.topCountries ||
+                dashboardData.topCountries.length === 0 ? (
                   <EmptyState
                     heading="No country data"
                     image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
@@ -266,13 +368,15 @@ export default function Analytics() {
                     headings={["Country", "Visits", "Blocked"]}
                     rows={dashboardData.topCountries.map((country) => [
                       country.country_code || "Unknown",
-                      country.visits,
+                      formatNumber(country.visits || 0),
                       <Text
                         tone={
-                          country.blocked_visits > 0 ? "critical" : "subdued"
+                          (country.blocked_visits || 0) > 0
+                            ? "critical"
+                            : "subdued"
                         }
                       >
-                        {country.blocked_visits}
+                        {formatNumber(country.blocked_visits || 0)}
                       </Text>,
                     ])}
                   />
@@ -286,7 +390,8 @@ export default function Analytics() {
                 <Text as="h2" variant="headingMd">
                   Device Types
                 </Text>
-                {dashboardData.deviceStats.length === 0 ? (
+                {!dashboardData.deviceStats ||
+                dashboardData.deviceStats.length === 0 ? (
                   <EmptyState
                     heading="No device data"
                     image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
@@ -308,10 +413,10 @@ export default function Analytics() {
                               : "success"
                           }
                         >
-                          {device.device_type}
+                          {device.device_type || "unknown"}
                         </Badge>
                       </InlineStack>,
-                      device.visits,
+                      formatNumber(device.visits || 0),
                       formatDuration(device.avg_duration),
                     ])}
                   />
@@ -321,14 +426,15 @@ export default function Analytics() {
           </InlineGrid>
         </Layout.Section>
 
-        {/* Top Pages */}
+        {/* Top Pages - Fixed duration calculation */}
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
               <Text as="h2" variant="headingMd">
                 Popular Pages
               </Text>
-              {dashboardData.topPages.length === 0 ? (
+              {!dashboardData.topPages ||
+              dashboardData.topPages.length === 0 ? (
                 <EmptyState
                   heading="No page data"
                   image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
@@ -340,12 +446,14 @@ export default function Analytics() {
                   columnContentTypes={["text", "numeric", "text"]}
                   headings={["Page URL", "Visits", "Avg. Duration"]}
                   rows={dashboardData.topPages.map((page) => [
-                    <Text variant="bodyMd" as="span" breakWord>
-                      {page.page_url?.length > 60
-                        ? page.page_url.substring(0, 60) + "..."
-                        : page.page_url}
-                    </Text>,
-                    page.visits,
+                    <Tooltip content={page.page_url || ""}>
+                      <Text variant="bodyMd" as="span" breakWord>
+                        {(page.page_url || "").length > 60
+                          ? (page.page_url || "").substring(0, 60) + "..."
+                          : page.page_url || "Unknown"}
+                      </Text>
+                    </Tooltip>,
+                    formatNumber(page.visits || 0),
                     formatDuration(page.avg_duration),
                   ])}
                 />
@@ -358,7 +466,13 @@ export default function Analytics() {
   };
 
   const renderVisitors = () => {
-    if (!visitorsData) return <Spinner size="large" />;
+    if (loadingStates.visitors || !visitorsData) {
+      return (
+        <div style={{ padding: "40px", textAlign: "center" }}>
+          <Spinner size="large" />
+        </div>
+      );
+    }
 
     return (
       <Layout>
@@ -370,12 +484,12 @@ export default function Analytics() {
                   Recent Visitors
                 </Text>
                 <Text variant="bodySm" tone="subdued">
-                  Showing {visitorsData.visitors.length} of{" "}
-                  {visitorsData.pagination.total} visitors
+                  Showing {visitorsData.visitors?.length || 0} of{" "}
+                  {visitorsData.pagination?.total || 0} visitors
                 </Text>
               </InlineStack>
 
-              {visitorsData.visitors.length === 0 ? (
+              {!visitorsData.visitors || visitorsData.visitors.length === 0 ? (
                 <EmptyState
                   heading="No visitor data"
                   image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
@@ -412,7 +526,7 @@ export default function Analytics() {
                           : "success"
                       }
                     >
-                      {visitor.device_type}
+                      {visitor.device_type || "unknown"}
                     </Badge>,
                     visitor.browser_name || "Unknown",
                     formatDuration(visitor.visit_duration),
@@ -434,20 +548,26 @@ export default function Analytics() {
   };
 
   const renderBlocking = () => {
-    if (!blockingData) return <Spinner size="large" />;
+    if (loadingStates.blocking || !blockingData) {
+      return (
+        <div style={{ padding: "40px", textAlign: "center" }}>
+          <Spinner size="large" />
+        </div>
+      );
+    }
 
     return (
       <Layout>
         <Layout.Section>
           <InlineGrid columns="4" gap="400">
-            {blockingData.blockingReasons.map((reason) => (
+            {(blockingData.blockingReasons || []).map((reason) => (
               <Card key={reason.reason_category}>
                 <BlockStack gap="200">
                   <Text variant="headingMd" tone="subdued">
                     {reason.reason_category}
                   </Text>
                   <Text variant="displayMedium" tone="critical">
-                    {reason.count}
+                    {formatNumber(reason.count || 0)}
                   </Text>
                 </BlockStack>
               </Card>
@@ -463,7 +583,8 @@ export default function Analytics() {
                 <Text as="h2" variant="headingMd">
                   Most Blocked Countries
                 </Text>
-                {blockingData.blockedCountries.length === 0 ? (
+                {!blockingData.blockedCountries ||
+                blockingData.blockedCountries.length === 0 ? (
                   <EmptyState
                     heading="No blocked countries"
                     image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
@@ -475,8 +596,8 @@ export default function Analytics() {
                     columnContentTypes={["text", "numeric"]}
                     headings={["Country", "Blocked Attempts"]}
                     rows={blockingData.blockedCountries.map((country) => [
-                      country.country_code,
-                      country.blocked_attempts,
+                      country.country_code || "Unknown",
+                      formatNumber(country.blocked_attempts || 0),
                     ])}
                   />
                 )}
@@ -489,7 +610,8 @@ export default function Analytics() {
                 <Text as="h2" variant="headingMd">
                   Most Blocked IPs
                 </Text>
-                {blockingData.blockedIPs.length === 0 ? (
+                {!blockingData.blockedIPs ||
+                blockingData.blockedIPs.length === 0 ? (
                   <EmptyState
                     heading="No blocked IPs"
                     image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
@@ -501,8 +623,8 @@ export default function Analytics() {
                     columnContentTypes={["text", "numeric"]}
                     headings={["IP Address", "Blocked Attempts"]}
                     rows={blockingData.blockedIPs.map((ip) => [
-                      ip.ip_address,
-                      ip.blocked_attempts,
+                      ip.ip_address || "Unknown",
+                      formatNumber(ip.blocked_attempts || 0),
                     ])}
                   />
                 )}
@@ -518,7 +640,8 @@ export default function Analytics() {
               <Text as="h2" variant="headingMd">
                 Blocked Bots
               </Text>
-              {blockingData.blockedBots.length === 0 ? (
+              {!blockingData.blockedBots ||
+              blockingData.blockedBots.length === 0 ? (
                 <EmptyState
                   heading="No blocked bots"
                   image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
@@ -531,7 +654,7 @@ export default function Analytics() {
                   headings={["Bot Name", "Blocked Attempts"]}
                   rows={blockingData.blockedBots.map((bot) => [
                     bot.bot_name || "Unknown Bot",
-                    bot.blocked_attempts,
+                    formatNumber(bot.blocked_attempts || 0),
                   ])}
                 />
               )}
@@ -543,8 +666,6 @@ export default function Analytics() {
   };
 
   const renderRealtime = () => {
-    if (!realtimeData) return <Spinner size="large" />;
-
     return (
       <Layout>
         <Layout.Section>
@@ -557,63 +678,70 @@ export default function Analytics() {
         </Layout.Section>
 
         <Layout.Section>
-          <InlineGrid columns="4" gap="400">
-            <Card>
-              <BlockStack gap="200">
-                <Text variant="headingMd" tone="subdued">
-                  Current Visitors
-                </Text>
-                <Text variant="displayLarge" tone="success">
-                  {realtimeData.stats.current_visitors}
-                </Text>
-                <Text variant="bodySm" tone="subdued">
-                  Last 30 minutes
-                </Text>
-              </BlockStack>
-            </Card>
+          {loadingStates.realtime ? (
+            <div style={{ padding: "40px", textAlign: "center" }}>
+              <Spinner size="large" />
+              <Text>Loading real-time data...</Text>
+            </div>
+          ) : (
+            <InlineGrid columns="4" gap="400">
+              <Card>
+                <BlockStack gap="200">
+                  <Text variant="headingMd" tone="subdued">
+                    Current Visitors
+                  </Text>
+                  <Text variant="displayLarge" tone="success">
+                    {formatNumber(realtimeData?.stats?.current_visitors || 0)}
+                  </Text>
+                  <Text variant="bodySm" tone="subdued">
+                    Last 30 minutes
+                  </Text>
+                </BlockStack>
+              </Card>
 
-            <Card>
-              <BlockStack gap="200">
-                <Text variant="headingMd" tone="subdued">
-                  Unique Visitors
-                </Text>
-                <Text variant="displayLarge">
-                  {realtimeData.stats.unique_visitors}
-                </Text>
-                <Text variant="bodySm" tone="subdued">
-                  Last 30 minutes
-                </Text>
-              </BlockStack>
-            </Card>
+              <Card>
+                <BlockStack gap="200">
+                  <Text variant="headingMd" tone="subdued">
+                    Unique Visitors
+                  </Text>
+                  <Text variant="displayLarge">
+                    {formatNumber(realtimeData?.stats?.unique_visitors || 0)}
+                  </Text>
+                  <Text variant="bodySm" tone="subdued">
+                    Last 30 minutes
+                  </Text>
+                </BlockStack>
+              </Card>
 
-            <Card>
-              <BlockStack gap="200">
-                <Text variant="headingMd" tone="subdued">
-                  Bot Visits
-                </Text>
-                <Text variant="displayLarge" tone="warning">
-                  {realtimeData.stats.bot_visits}
-                </Text>
-                <Text variant="bodySm" tone="subdued">
-                  Last 30 minutes
-                </Text>
-              </BlockStack>
-            </Card>
+              <Card>
+                <BlockStack gap="200">
+                  <Text variant="headingMd" tone="subdued">
+                    Bot Visits
+                  </Text>
+                  <Text variant="displayLarge" tone="warning">
+                    {formatNumber(realtimeData?.stats?.bot_visits || 0)}
+                  </Text>
+                  <Text variant="bodySm" tone="subdued">
+                    Last 30 minutes
+                  </Text>
+                </BlockStack>
+              </Card>
 
-            <Card>
-              <BlockStack gap="200">
-                <Text variant="headingMd" tone="subdued">
-                  Blocked Visits
-                </Text>
-                <Text variant="displayLarge" tone="critical">
-                  {realtimeData.stats.blocked_visits}
-                </Text>
-                <Text variant="bodySm" tone="subdued">
-                  Last 30 minutes
-                </Text>
-              </BlockStack>
-            </Card>
-          </InlineGrid>
+              <Card>
+                <BlockStack gap="200">
+                  <Text variant="headingMd" tone="subdued">
+                    Blocked Visits
+                  </Text>
+                  <Text variant="displayLarge" tone="critical">
+                    {formatNumber(realtimeData?.stats?.blocked_visits || 0)}
+                  </Text>
+                  <Text variant="bodySm" tone="subdued">
+                    Last 30 minutes
+                  </Text>
+                </BlockStack>
+              </Card>
+            </InlineGrid>
+          )}
         </Layout.Section>
 
         <Layout.Section>
@@ -622,7 +750,8 @@ export default function Analytics() {
               <Text as="h2" variant="headingMd">
                 Recent Activity
               </Text>
-              {realtimeData.recentVisitors.length === 0 ? (
+              {!realtimeData?.recentVisitors ||
+              realtimeData.recentVisitors.length === 0 ? (
                 <EmptyState
                   heading="No recent activity"
                   image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
@@ -660,11 +789,13 @@ export default function Analytics() {
                           : "success"
                       }
                     >
-                      {visitor.device_type}
+                      {visitor.device_type || "unknown"}
                     </Badge>,
-                    <Text variant="bodyMd" as="span" breakWord>
-                      {visitor.page_url?.split("/").pop() || "/"}
-                    </Text>,
+                    <Tooltip content={visitor.page_url || ""}>
+                      <Text variant="bodyMd" as="span" breakWord>
+                        {(visitor.page_url || "").split("/").pop() || "/"}
+                      </Text>
+                    </Tooltip>,
                     visitor.blocked_reason ? (
                       <Badge tone="critical">Blocked</Badge>
                     ) : visitor.is_bot ? (
@@ -688,6 +819,7 @@ export default function Analytics() {
         <Card>
           <div style={{ padding: "40px", textAlign: "center" }}>
             <Spinner size="large" />
+            <Text>Loading analytics data...</Text>
           </div>
         </Card>
       </Page>
@@ -705,6 +837,11 @@ export default function Analytics() {
       }}
       secondaryActions={[
         {
+          content: "Refresh",
+          onAction: handleRefresh,
+          icon: RefreshIcon,
+        },
+        {
           content: "Export JSON",
           onAction: () => exportData("json"),
         },
@@ -718,15 +855,26 @@ export default function Analytics() {
               selected={selectedTab}
               onSelect={handleTabChange}
             />
-            {selectedTab !== 3 && (
-              <Select
-                label="Time Range"
-                labelHidden
-                options={timeRangeOptions}
-                value={timeRange}
-                onChange={handleTimeRangeChange}
-              />
-            )}
+            <InlineStack gap="200">
+              {selectedTab !== 3 && (
+                <Select
+                  label="Time Range"
+                  labelHidden
+                  options={timeRangeOptions}
+                  value={timeRange}
+                  onChange={handleTimeRangeChange}
+                />
+              )}
+              {selectedTab !== 3 && (
+                <Button
+                  variant="tertiary"
+                  tone={autoRefresh ? "success" : "base"}
+                  onClick={() => setAutoRefresh(!autoRefresh)}
+                >
+                  {autoRefresh ? "Auto-refresh ON" : "Auto-refresh OFF"}
+                </Button>
+              )}
+            </InlineStack>
           </InlineStack>
         </Layout.Section>
 

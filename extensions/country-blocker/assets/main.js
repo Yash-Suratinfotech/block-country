@@ -1,457 +1,663 @@
-// extensions/country-blocker/assets/enhanced-main.js
-(async () => {
-  try {
-    // Enhanced blocking and analytics script with redirect support
+// extensions/country-blocker/assets/app.js
+// import {
+//   timezoneMap,
+//   botPatterns,
+//   getSessionId,
+//   getClientIP,
+//   getShopDomain,
+// } from "./helper.js";
 
-    // Utility functions
-    function generateSessionId() {
+(function () {
+  "use strict";
+
+  // Static Timezone to Country mapping
+  const timezoneMap = {
+    "America/New_York": "US",
+    "America/Chicago": "US",
+    "America/Los_Angeles": "US",
+    "America/Denver": "US",
+    "America/Phoenix": "US",
+    "America/Anchorage": "US",
+    "America/Toronto": "CA",
+    "America/Vancouver": "CA",
+    "America/Mexico_City": "MX",
+    "America/Sao_Paulo": "BR",
+    "America/Buenos_Aires": "AR",
+    "Europe/London": "GB",
+    "Europe/Paris": "FR",
+    "Europe/Berlin": "DE",
+    "Europe/Rome": "IT",
+    "Europe/Madrid": "ES",
+    "Europe/Amsterdam": "NL",
+    "Europe/Brussels": "BE",
+    "Europe/Zurich": "CH",
+    "Europe/Vienna": "AT",
+    "Europe/Warsaw": "PL",
+    "Europe/Prague": "CZ",
+    "Europe/Budapest": "HU",
+    "Europe/Athens": "GR",
+    "Europe/Stockholm": "SE",
+    "Europe/Oslo": "NO",
+    "Europe/Copenhagen": "DK",
+    "Europe/Helsinki": "FI",
+    "Europe/Moscow": "RU",
+    "Europe/Istanbul": "TR",
+    "Africa/Cairo": "EG",
+    "Africa/Johannesburg": "ZA",
+    "Africa/Lagos": "NG",
+    "Africa/Nairobi": "KE",
+    "Asia/Dubai": "AE",
+    "Asia/Jerusalem": "IL",
+    "Asia/Riyadh": "SA",
+    "Asia/Tehran": "IR",
+    "Asia/Karachi": "PK",
+    "Asia/Kolkata": "IN",
+    "Asia/Calcutta": "IN",
+    "Asia/Dhaka": "BD",
+    "Asia/Jakarta": "ID",
+    "Asia/Singapore": "SG",
+    "Asia/Kuala_Lumpur": "MY",
+    "Asia/Manila": "PH",
+    "Asia/Hong_Kong": "HK",
+    "Asia/Shanghai": "CN",
+    "Asia/Beijing": "CN",
+    "Asia/Tokyo": "JP",
+    "Asia/Seoul": "KR",
+    "Australia/Sydney": "AU",
+    "Australia/Melbourne": "AU",
+    "Australia/Brisbane": "AU",
+    "Australia/Perth": "AU",
+    "Pacific/Auckland": "NZ",
+    "Pacific/Honolulu": "US",
+  };
+
+  // Static bot detection patterns
+  const botPatterns = [
+    "googlebot",
+    "bingbot",
+    "slurp",
+    "duckduckbot",
+    "baiduspider",
+    "yandexbot",
+    "facebookexternalhit",
+    "twitterbot",
+    "linkedinbot",
+    "pinterest",
+    "whatsapp",
+    "ahrefsbot",
+    "semrushbot",
+    "mj12bot",
+    "dotbot",
+    "bot",
+    "crawler",
+    "spider",
+    "scraper",
+    "curl",
+    "wget",
+    "python-requests",
+    "axios",
+    "node-fetch",
+  ];
+
+  //  session ID generator with better uniqueness
+  function getSessionId() {
+    try {
+      let sessionId = sessionStorage.getItem("bc_session");
+      if (!sessionId) {
+        // Create more unique session ID
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).substr(2, 9);
+        const userAgent = navigator.userAgent
+          .substr(0, 20)
+          .replace(/[^a-zA-Z0-9]/g, "");
+        sessionId = `session_${random}_${timestamp}_${userAgent}`;
+        sessionStorage.setItem("bc_session", sessionId);
+        console.log("✌️Created new session:", sessionId);
+      } else {
+        console.log("✌️Using existing session:", sessionId);
+      }
+      return sessionId;
+    } catch (error) {
+      console.log("✌️SessionStorage error, using temp session");
       return (
-        "session_" + Math.random().toString(36).substr(2, 9) + "_" + Date.now()
+        "temp_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5)
       );
     }
+  }
 
-    function guessCountryCode() {
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const timezoneToCountry = {
-        "America/New_York": "US",
-        "America/Chicago": "US",
-        "America/Los_Angeles": "US",
-        "America/Denver": "US",
-        "America/Phoenix": "US",
-        "America/Anchorage": "US",
-        "America/Toronto": "CA",
-        "America/Vancouver": "CA",
-        "America/Mexico_City": "MX",
-        "America/Sao_Paulo": "BR",
-        "America/Buenos_Aires": "AR",
-        "Europe/London": "GB",
-        "Europe/Paris": "FR",
-        "Europe/Berlin": "DE",
-        "Europe/Rome": "IT",
-        "Europe/Madrid": "ES",
-        "Europe/Amsterdam": "NL",
-        "Europe/Brussels": "BE",
-        "Europe/Zurich": "CH",
-        "Europe/Vienna": "AT",
-        "Europe/Warsaw": "PL",
-        "Europe/Prague": "CZ",
-        "Europe/Budapest": "HU",
-        "Europe/Athens": "GR",
-        "Europe/Stockholm": "SE",
-        "Europe/Oslo": "NO",
-        "Europe/Copenhagen": "DK",
-        "Europe/Helsinki": "FI",
-        "Europe/Moscow": "RU",
-        "Europe/Istanbul": "TR",
-        "Africa/Cairo": "EG",
-        "Africa/Johannesburg": "ZA",
-        "Africa/Lagos": "NG",
-        "Africa/Nairobi": "KE",
-        "Asia/Dubai": "AE",
-        "Asia/Jerusalem": "IL",
-        "Asia/Riyadh": "SA",
-        "Asia/Tehran": "IR",
-        "Asia/Karachi": "PK",
-        "Asia/Kolkata": "IN",
-        "Asia/Calcutta": "IN",
-        "Asia/Dhaka": "BD",
-        "Asia/Bangkok": "TH",
-        "Asia/Jakarta": "ID",
-        "Asia/Singapore": "SG",
-        "Asia/Kuala_Lumpur": "MY",
-        "Asia/Manila": "PH",
-        "Asia/Hong_Kong": "HK",
-        "Asia/Shanghai": "CN",
-        "Asia/Beijing": "CN",
-        "Asia/Tokyo": "JP",
-        "Asia/Seoul": "KR",
-        "Australia/Sydney": "AU",
-        "Australia/Melbourne": "AU",
-        "Australia/Brisbane": "AU",
-        "Australia/Perth": "AU",
-        "Pacific/Auckland": "NZ",
-        "Pacific/Honolulu": "US",
+  //  IP detection - try multiple methods
+  function getClientIP() {
+    return new Promise((resolve) => {
+      // Method 1: Try WebRTC (most accurate for real IP)
+      const rtc = new RTCPeerConnection({
+        iceServers: [],
+      });
+
+      let ip = null;
+
+      rtc.createDataChannel("");
+      rtc.createOffer().then((offer) => rtc.setLocalDescription(offer));
+
+      rtc.onicecandidate = function (ice) {
+        if (!ice || !ice.candidate || !ice.candidate.candidate) return;
+
+        const candidate = ice.candidate.candidate;
+        const ipMatch = candidate.match(
+          /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/
+        );
+
+        if (ipMatch && !ip) {
+          ip = ipMatch[1];
+          console.log("✌️Detected IP via WebRTC:", ip);
+          resolve(ip);
+          rtc.close();
+        }
       };
-      return timezoneToCountry[timezone] || null;
+
+      // Fallback after 2 seconds
+      setTimeout(() => {
+        if (!ip) {
+          console.log("✌️WebRTC IP detection failed, using fallback");
+          resolve(null);
+        }
+      }, 2000);
+    });
+  }
+
+  // Get shop domain directly
+  function getShopDomain() {
+    // Try multiple ways to get shop domain
+    if (typeof Shopify !== "undefined" && Shopify.shop) {
+      console.log("✌️Got shop from Shopify object:", Shopify.shop);
+      return Shopify.shop;
     }
 
-    function detectDeviceType() {
+    // Try to extract from current URL
+    const hostname = window.location.hostname;
+    if (hostname.includes(".myshopify.com")) {
+      console.log("✌️Got shop from URL:", hostname);
+      return hostname;
+    }
+
+    // Try to find in page content
+    const scripts = document.querySelectorAll("script");
+    for (let script of scripts) {
+      if (script.textContent && script.textContent.includes(".myshopify.com")) {
+        const match = script.textContent.match(
+          /([a-zA-Z0-9\-]+\.myshopify\.com)/
+        );
+        if (match) {
+          console.log("✌️Got shop from script content:", match[1]);
+          return match[1];
+        }
+      }
+    }
+
+    console.log("✌️Could not determine shop domain");
+    return null;
+  }
+
+  // Enhanced country detection
+  function getCountryCode() {
+    try {
+      // Method 1: Try to get from timezone
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      console.log("✌️Detected timezone:", timezone);
+
+      let country = timezoneMap[timezone];
+
+      // Method 2: Try to get from locale
+      if (!country) {
+        const locale = navigator.language || navigator.languages[0];
+        if (locale) {
+          const localeCountry = locale.split("-")[1];
+          if (localeCountry && localeCountry.length === 2) {
+            country = localeCountry.toUpperCase();
+            console.log("✌️Detected country from locale:", country);
+          }
+        }
+      }
+
+      console.log("✌️Final detected country:", country);
+      return country;
+    } catch (error) {
+      console.log("✌️Error detecting country:", error.message);
+      return null;
+    }
+  }
+
+  // Enhanced device detection
+  function getDeviceType() {
+    try {
       const userAgent = navigator.userAgent;
-      if (/tablet|ipad|playbook|silk/i.test(userAgent)) {
+      const screenWidth = window.screen.width;
+
+      // Combine user agent and screen size for better detection
+      if (
+        /tablet|ipad|playbook|silk/i.test(userAgent) ||
+        (screenWidth >= 768 && screenWidth <= 1024)
+      ) {
         return "tablet";
       }
       if (
         /mobile|iphone|ipod|android|blackberry|opera|mini|windows\sce|palm|smartphone|iemobile/i.test(
           userAgent
-        )
+        ) ||
+        screenWidth < 768
       ) {
         return "mobile";
       }
       return "desktop";
+    } catch (error) {
+      console.log("✌️Error detecting device:", error.message);
+      return "unknown";
     }
+  }
 
-    function detectBrowser() {
+  // Enhanced browser detection
+  function getBrowser() {
+    try {
       const userAgent = navigator.userAgent;
-      if (userAgent.includes("Chrome")) return "Chrome";
-      if (userAgent.includes("Firefox")) return "Firefox";
-      if (userAgent.includes("Safari")) return "Safari";
-      if (userAgent.includes("Edge")) return "Edge";
-      if (userAgent.includes("Opera")) return "Opera";
+      if (userAgent.includes("Edg/")) return "Edge";
+      if (userAgent.includes("Chrome/")) return "Chrome";
+      if (userAgent.includes("Firefox/")) return "Firefox";
+      if (userAgent.includes("Safari/") && !userAgent.includes("Chrome/"))
+        return "Safari";
+      if (userAgent.includes("Opera/") || userAgent.includes("OPR/"))
+        return "Opera";
+      return "Unknown";
+    } catch (error) {
+      console.log("✌️Error detecting browser:", error.message);
       return "Unknown";
     }
+  }
 
-    function isBot() {
+  // Enhanced bot detection
+  function isBot() {
+    try {
       const userAgent = navigator.userAgent.toLowerCase();
-      const botPatterns = [
-        "googlebot",
-        "bingbot",
-        "slurp",
-        "duckduckbot",
-        "baiduspider",
-        "yandexbot",
-        "facebookexternalhit",
-        "twitterbot",
-        "linkedinbot",
-        "pinterest",
-        "whatsapp",
-        "ahrefsbot",
-        "semrushbot",
-        "mj12bot",
-        "dotbot",
-        "bot",
-        "crawler",
-        "spider",
+
+      const detected = botPatterns.some((pattern) =>
+        userAgent.includes(pattern)
+      );
+
+      // Additional heuristics
+      const suspiciousPatterns = [
+        () => userAgent === "", // Empty user agent
+        () => !/mozilla/i.test(userAgent) && !/gecko/i.test(userAgent), // Missing common browser identifiers
+        () => !navigator.languages || navigator.languages.length === 0, // No language preferences
+        () => navigator.webdriver === true, // Automated browser
+        () => window.phantom !== undefined, // PhantomJS
+        () => window.callPhantom !== undefined, // PhantomJS
       ];
-      return botPatterns.some((pattern) => userAgent.includes(pattern));
+
+      const isSuspicious = suspiciousPatterns.some((check) => check());
+
+      console.log("✌️Bot detection result:", detected || isSuspicious);
+      return detected || isSuspicious;
+    } catch (error) {
+      console.log("✌️Error in bot detection:", error.message);
+      return false;
+    }
+  }
+
+  // Show blocking message
+  function showBlockMessage(result) {
+    console.log("✌️Showing block message:", result);
+
+    let message =
+      '<div style="text-align:center;margin-top:20%;font-family:Arial,sans-serif;padding:40px;">';
+    message +=
+      '<h1 style="color:#d32f2f;margin-bottom:20px;">Access Restricted</h1>';
+
+    if (result?.redirect_info && result?.redirect_info.custom_message) {
+      message +=
+        '<p style="font-size:18px;margin-bottom:20px;">' +
+        result?.redirect_info.custom_message +
+        "</p>";
+    } else if (result?.reason) {
+      if (result?.reason.includes("Country")) {
+        message +=
+          '<p style="font-size:18px;margin-bottom:20px;">Sorry, this store is not available in your country.</p>';
+      } else if (result?.reason.includes("IP")) {
+        message +=
+          '<p style="font-size:18px;margin-bottom:20px;">Your access has been restricted.</p>';
+      } else if (result?.reason.includes("Bot")) {
+        message +=
+          '<p style="font-size:18px;margin-bottom:20px;">Automated access is not allowed.</p>';
+      } else {
+        message +=
+          '<p style="font-size:18px;margin-bottom:20px;">Access to this store has been restricted.</p>';
+      }
+    } else {
+      message +=
+        '<p style="font-size:18px;margin-bottom:20px;">Access to this store has been restricted.</p>';
     }
 
-    function showBlockMessage(message, customStyle = {}) {
-      const defaultStyle = {
-        textAlign: "center",
-        marginTop: "20%",
-        fontFamily: "Arial, sans-serif",
-        padding: "40px",
-        color: "#333",
+    message +=
+      '<p style="color:#666;font-size:14px;margin-top:30px;">If you believe this is an error, please contact support.</p>';
+    message += "</div>";
+
+    document.body.innerHTML = message;
+  }
+
+  // Handle redirect with better UX
+  function handleRedirect(redirectInfo) {
+    console.log("✌️Redirecting to:", redirectInfo.redirect_url);
+
+    const loadingMessage = `
+      <div style="text-align:center;margin-top:20%;font-family:Arial,sans-serif;padding:40px;">
+        <h1 style="color:#d32f2f;margin-bottom:20px;">Access Restricted</h1>
+        <p style="font-size:18px;margin-bottom:30px;">${
+          redirectInfo.custom_message ||
+          "Redirecting you to an appropriate page..."
+        }</p>
+        <div style="margin:30px 0;">
+          <div style="display:inline-block;width:20px;height:20px;border:2px solid #d32f2f;border-top:2px solid transparent;border-radius:50%;animation:spin 1s linear infinite;"></div>
+        </div>
+        <p style="color:#666;font-size:14px;">You will be redirected in 3 seconds...</p>
+        <style>
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        </style>
+      </div>
+    `;
+
+    document.body.innerHTML = loadingMessage;
+
+    setTimeout(function () {
+      window.location.href = redirectInfo.redirect_url;
+    }, 3000); // Increased to 3 seconds for better UX
+  }
+
+  // Track analytics with better session management
+  function trackAnalytics(shop, sessionData) {
+    try {
+      console.log("✌️Tracking analytics with enhanced data");
+
+      // Get page performance data if available
+      let performanceData = {};
+      if (window.performance && window.performance.timing) {
+        const timing = window.performance.timing;
+        performanceData = {
+          loadTime: timing.loadEventEnd - timing.navigationStart,
+          domReady: timing.domContentLoadedEventEnd - timing.navigationStart,
+          firstPaint: timing.responseEnd - timing.navigationStart,
+        };
+      }
+
+      const data = {
+        shop: shop,
+        session_id: sessionData.sessionId,
+        country_code: sessionData.country,
+        device_type: sessionData.device,
+        browser: sessionData.browser,
+        is_bot: sessionData.isBot,
+        page_url: window.location.href,
+        referrer: document.referrer || null,
+        duration: Math.round((Date.now() - sessionData.startTime) / 1000),
+        page_views: sessionData.pageViews || 1,
+        user_agent: navigator.userAgent,
+        screen_resolution: `${window.screen.width}x${window.screen.height}`,
+        viewport_size: `${window.innerWidth}x${window.innerHeight}`,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        language: navigator.language,
+        performance: performanceData,
+        client_ip: sessionData.clientIP || null,
       };
 
-      const style = { ...defaultStyle, ...customStyle };
-      const styleString = Object.entries(style)
-        .map(
-          ([key, value]) =>
-            `${key.replace(/([A-Z])/g, "-$1").toLowerCase()}:${value}`
-        )
-        .join(";");
-
-      document.body.innerHTML = `<div style="${styleString}">${message}</div>`;
+      fetch("/apps/proxy-1/track_analytics", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify(data),
+      })
+        .then(function (response) {
+          if (response?.ok) {
+            console.log("✌️Analytics tracked successfully");
+            // Update page view count
+            sessionData.pageViews = (sessionData.pageViews || 1) + 1;
+            sessionStorage.setItem(
+              "bc_page_views",
+              sessionData.pageViews.toString()
+            );
+          } else {
+            console.log("✌️Analytics tracking failed:", response?.status);
+          }
+        })
+        .catch(function (error) {
+          console.log("✌️Analytics error:", error.message);
+        });
+    } catch (error) {
+      console.log("✌️Analytics tracking error:", error.message);
     }
+  }
 
-    function handleRedirect(redirectUrl, delay = 0) {
-      if (delay > 0) {
-        setTimeout(() => {
-          window.location.href = redirectUrl;
-        }, delay);
-      } else {
-        window.location.href = redirectUrl;
-      }
-    }
+  // Main access check function with enhanced IP detection
+  async function checkAccess() {
+    console.log("✌️Starting enhanced access check");
 
-    // Get session info
-    const sessionId =
-      sessionStorage.getItem("blockapp_session") || generateSessionId();
-    sessionStorage.setItem("blockapp_session", sessionId);
-
-    const countryCode = guessCountryCode();
-    const deviceType = detectDeviceType();
-    const browser = detectBrowser();
-    const isUserBot = isBot();
-    const startTime = Date.now();
-
-    console.log("Enhanced Block Country - Session Info:", {
-      sessionId,
-      country: countryCode,
-      device: deviceType,
-      browser: browser,
-      isBot: isUserBot,
-    });
-
-    // Check access permissions with enhanced endpoint
-    const checkUrl = new URL(
-      `/apps/proxy-1/check_access_enhanced`,
-      window.location.origin
-    );
-    checkUrl.searchParams.set("shop", Shopify.shop);
-    checkUrl.searchParams.set("session_id", sessionId);
-    checkUrl.searchParams.set("device_type", deviceType);
-    checkUrl.searchParams.set("browser", browser);
-    checkUrl.searchParams.set("is_bot", isUserBot);
-    checkUrl.searchParams.set("page_url", window.location.href);
-    checkUrl.searchParams.set("referrer", document.referrer || "");
-
-    if (countryCode) {
-      checkUrl.searchParams.set("country", countryCode);
-    }
-
-    const response = await fetch(checkUrl.toString());
-    const result = await response.json();
-
-    console.log("Enhanced access check result:", result);
-
-    // Handle blocking with redirect support
-    if (result.blocked) {
-      console.log("Access blocked:", result.reason);
-
-      // Check if there's a specific redirect URL for this block
-      let redirectUrl = null;
-      let customMessage = null;
-
-      if (result.redirect_info) {
-        redirectUrl = result.redirect_info.redirect_url;
-        customMessage = result.redirect_info.custom_message;
-      }
-
-      // Handle redirection
-      if (redirectUrl) {
-        console.log("Redirecting to:", redirectUrl);
-
-        // Show a brief message before redirecting
-        showBlockMessage(`
-          <h1 style="color:#d32f2f;">Access Restricted</h1>
-          <p>Redirecting you to an appropriate page...</p>
-          <div style="margin-top:20px;">
-            <div style="display:inline-block;width:20px;height:20px;border:2px solid #d32f2f;border-top:2px solid transparent;border-radius:50%;animation:spin 1s linear infinite;"></div>
-          </div>
-          <style>
-            @keyframes spin {
-              0% { transform: rotate(0deg); }
-              100% { transform: rotate(360deg); }
-            }
-          </style>
-        `);
-
-        // Redirect after 2 seconds
-        handleRedirect(redirectUrl, 2000);
-        return;
-      }
-
-      // Show block message (no redirect)
-      let message =
-        '<div style="text-align:center;margin-top:20%;font-family:Arial,sans-serif;">';
-      message += '<h1 style="color:#d32f2f;">Access Restricted</h1>';
-
-      if (customMessage) {
-        message += `<p>${customMessage}</p>`;
-      } else if (result.reason) {
-        if (result.reason.includes("Country")) {
-          message +=
-            "<p>Sorry, this store is not available in your country.</p>";
-        } else if (result.reason.includes("IP")) {
-          message += "<p>Your access has been restricted.</p>";
-        } else if (result.reason.includes("Bot")) {
-          message += "<p>Automated access is not allowed.</p>";
-        } else {
-          message += "<p>Access to this store has been restricted.</p>";
-        }
-      } else {
-        message += "<p>Access to this store has been restricted.</p>";
-      }
-
-      message +=
-        '<p style="color:#666;font-size:14px;margin-top:20px;">If you believe this is an error, please contact support.</p>';
-      message += "</div>";
-
-      showBlockMessage(message);
+    // Get shop domain
+    const shop = getShopDomain();
+    if (!shop) {
+      console.log("✌️No shop domain found, skipping check");
       return;
     }
 
-    // Load content protection if enabled
-    if (result.contentProtection && result.contentProtection.enabled) {
-      const protectionScript = document.createElement("script");
-      protectionScript.src = `/apps/proxy-1/content_protection_script?shop=${Shopify.shop}`;
-      protectionScript.onerror = () => {
-        console.log("Content protection script failed to load");
-      };
-      document.head.appendChild(protectionScript);
-    }
+    // Try to get client IP
+    const clientIP = await getClientIP();
 
-    // Analytics tracking with enhanced data
-    let pageViews = 1;
-    let lastActivityTime = Date.now();
-    let interactionCount = 0;
-
-    // Track page view duration and interactions
-    function trackPageView() {
-      const duration = Math.round((Date.now() - startTime) / 1000);
-
-      fetch(`/apps/proxy-1/track_analytics`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          shop: Shopify.shop,
-          session_id: sessionId,
-          country_code: countryCode,
-          device_type: deviceType,
-          browser: browser,
-          is_bot: isUserBot,
-          page_url: window.location.href,
-          referrer: document.referrer || null,
-          duration: duration,
-          page_views: pageViews,
-          interaction_count: interactionCount,
-          user_agent: navigator.userAgent,
-        }),
-      }).catch((err) => console.log("Analytics tracking error:", err));
-    }
-
-    // Track user activity and interactions
-    function trackActivity(eventType) {
-      lastActivityTime = Date.now();
-      interactionCount++;
-
-      // Track specific interaction types
-      if (eventType === "page_change") {
-        pageViews++;
-      }
-    }
-
-    // Enhanced event listeners for activity tracking
-    const trackingEvents = [
-      { event: "click", type: "click" },
-      { event: "scroll", type: "scroll" },
-      { event: "keypress", type: "keypress" },
-      { event: "mousemove", type: "mousemove" },
-    ];
-
-    trackingEvents.forEach(({ event, type }) => {
-      document.addEventListener(event, () => trackActivity(type), {
-        passive: true,
-      });
-    });
-
-    // Track page visibility changes
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") {
-        trackActivity("page_visible");
-      } else {
-        trackPageView(); // Track when page becomes hidden
-      }
-    });
-
-    // Track page changes for SPAs
-    let currentUrl = window.location.href;
-    const checkForUrlChange = () => {
-      if (window.location.href !== currentUrl) {
-        currentUrl = window.location.href;
-        trackActivity("page_change");
-      }
+    // Collect enhanced session data
+    const sessionData = {
+      sessionId: getSessionId(),
+      country: getCountryCode(),
+      device: getDeviceType(),
+      browser: getBrowser(),
+      isBot: isBot(),
+      startTime: Date.now(),
+      clientIP: clientIP,
+      pageViews: parseInt(sessionStorage.getItem("bc_page_views") || "1"),
     };
 
-    // Check for URL changes every 500ms (for SPAs)
-    setInterval(checkForUrlChange, 500);
+    console.log("✌️Enhanced session data:", sessionData);
 
-    // Track page view on load
-    window.addEventListener("load", trackPageView);
+    // Build API URL with all data
+    const apiUrl = new URL(
+      "/apps/proxy-1/check_access_enhanced",
+      window.location.origin
+    );
+    apiUrl.searchParams.set("shop", shop);
+    apiUrl.searchParams.set("session_id", sessionData.sessionId);
+    apiUrl.searchParams.set("device_type", sessionData.device);
+    apiUrl.searchParams.set("browser", sessionData.browser);
+    apiUrl.searchParams.set("is_bot", sessionData.isBot);
+    apiUrl.searchParams.set("page_url", window.location.href);
+    apiUrl.searchParams.set("referrer", document.referrer || "");
 
-    // Track page view before unload
-    window.addEventListener("beforeunload", trackPageView);
+    if (sessionData.country) {
+      apiUrl.searchParams.set("country", sessionData.country);
+    }
 
-    // Periodic tracking (every 30 seconds if active)
-    setInterval(() => {
-      if (Date.now() - lastActivityTime < 30000) {
-        // Active in last 30 seconds
-        trackPageView();
+    if (clientIP) {
+      apiUrl.searchParams.set("client_ip", clientIP);
+    }
+
+    console.log("✌️Enhanced API URL:", apiUrl.toString());
+
+    // Make API call with better error handling
+    try {
+      const response = await fetch(apiUrl.toString(), {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      });
+
+      if (!response?.ok) {
+        throw new Error(`HTTP ${response?.status}: ${response?.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log("✌️Enhanced access check result:", result);
+
+      if (result?.blocked) {
+        console.log("✌️Access is blocked:", result?.reason);
+
+        // Handle redirect with enhanced info
+        if (result?.redirect_info && result?.redirect_info.redirect_url) {
+          handleRedirect(result?.redirect_info);
+        } else {
+          showBlockMessage(result);
+        }
+        return;
+      }
+
+      console.log("✌️Access allowed");
+
+      // Load content protection if enabled
+      if (result?.contentProtection && result?.contentProtection.enabled) {
+        loadContentProtection(shop, result.contentProtection.settings);
+      }
+
+      // Track analytics with enhanced data
+      trackAnalytics(shop, sessionData);
+    } catch (error) {
+      console.log("✌️Access check failed:", error.message);
+
+      // Fail open - don't block if API call fails
+      console.log("✌️Failing open due to error");
+
+      // Still try to track analytics
+      trackAnalytics(shop, sessionData);
+    }
+  }
+
+  // Enhanced content protection loading
+  function loadContentProtection(shop, settings) {
+    try {
+      console.log("✌️Loading enhanced content protection");
+
+      // Load the content protection script with settings
+      const script = document.createElement("script");
+      script.src = `/apps/proxy-1/content_protection_script?shop=${shop}`;
+      script.onload = function () {
+        console.log("✌️Content protection loaded successfully");
+      };
+      script.onerror = function () {
+        console.log("✌️Content protection failed to load");
+      };
+      document.head.appendChild(script);
+    } catch (error) {
+      console.log("✌️Error loading content protection:", error.message);
+    }
+  }
+
+  // Initialize when ready
+  function init() {
+    console.log("✌️Initializing enhanced Block Country script...");
+
+    // Run immediately
+    checkAccess();
+
+    // Set up periodic analytics tracking (every 30 seconds for active sessions)
+    let lastActivity = Date.now();
+
+    // Track user activity
+    const activityEvents = ["click", "scroll", "mousemove", "keypress"];
+    activityEvents.forEach((event) => {
+      document.addEventListener(
+        event,
+        () => {
+          lastActivity = Date.now();
+        },
+        { passive: true }
+      );
+    });
+
+    // Periodic tracking for active users
+    setInterval(function () {
+      if (Date.now() - lastActivity < 60000) {
+        // Active in last minute
+        const shop = getShopDomain();
+        if (shop) {
+          trackAnalytics(shop, {
+            sessionId: getSessionId(),
+            country: getCountryCode(),
+            device: getDeviceType(),
+            browser: getBrowser(),
+            isBot: isBot(),
+            startTime: Date.now(),
+            pageViews: parseInt(sessionStorage.getItem("bc_page_views") || "1"),
+          });
+        }
       }
     }, 30000);
 
-    // Enhanced bot detection and validation
-    if (isUserBot) {
-      console.log("Bot detected - Enhanced monitoring active");
+    // Track page visibility changes
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "hidden") {
+        // User left the page, do final analytics update
+        const shop = getShopDomain();
+        if (shop) {
+          navigator.sendBeacon(
+            "/apps/proxy-1/track_analytics",
+            JSON.stringify({
+              shop: shop,
+              session_id: getSessionId(),
+              action: "page_exit",
+              duration: Math.round(
+                (Date.now() -
+                  parseInt(
+                    sessionStorage.getItem("bc_start_time") || Date.now()
+                  )) /
+                  1000
+              ),
+            })
+          );
+        }
+      }
+    });
 
-      // Additional bot validation
-      const botCheckUrl = new URL(
-        `/apps/proxy-1/validate_bot`,
-        window.location.origin
-      );
-      botCheckUrl.searchParams.set("shop", Shopify.shop);
-      botCheckUrl.searchParams.set("user_agent", navigator.userAgent);
+    console.log("✌️Enhanced initialization complete");
+  }
 
-      fetch(botCheckUrl.toString())
-        .then((res) => res.json())
-        .then((botResult) => {
-          if (botResult.blocked) {
-            if (botResult.redirect_url) {
-              handleRedirect(botResult.redirect_url);
-            } else {
-              showBlockMessage(
-                '<h1 style="text-align:center;margin-top:20%;">Bot access not permitted</h1>'
-              );
-            }
-          }
-        })
-        .catch((err) => console.log("Bot validation error:", err));
-    }
+  // Start when DOM is ready
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
 
-    // Performance monitoring with error tracking
-    if (window.performance && window.performance.timing) {
-      const perfData = window.performance.timing;
-      const loadTime = perfData.loadEventEnd - perfData.navigationStart;
+  // Enhanced global error handler
+  window.addEventListener("error", function (event) {
+    console.log(
+      "✌️Global error captured:",
+      event.message,
+      event.filename,
+      event.lineno
+    );
 
-      // Track performance metrics
-      setTimeout(() => {
-        fetch(`/apps/proxy-1/track_performance`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            shop: Shopify.shop,
-            session_id: sessionId,
-            load_time: loadTime,
-            dom_ready:
-              perfData.domContentLoadedEventEnd - perfData.navigationStart,
-            page_url: window.location.href,
-            connection_type: navigator.connection
-              ? navigator.connection.effectiveType
-              : "unknown",
-            memory_info: navigator.deviceMemory || null,
-          }),
-        }).catch((err) => console.log("Performance tracking error:", err));
-      }, 1000);
-    }
-
-    // Error tracking
-    window.addEventListener("error", (event) => {
-      fetch(`/apps/proxy-1/track_error`, {
+    // Track errors for debugging
+    const shop = getShopDomain();
+    if (shop) {
+      fetch("/apps/proxy-1/track_error", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          shop: Shopify.shop,
-          session_id: sessionId,
+          shop: shop,
+          session_id: getSessionId(),
           error_message: event.message,
           error_source: event.filename,
           error_line: event.lineno,
           page_url: window.location.href,
           user_agent: navigator.userAgent,
         }),
-      }).catch((err) => console.log("Error tracking failed:", err));
-    });
-
-    console.log("Enhanced Block Country script loaded successfully");
-  } catch (error) {
-    console.error("Enhanced Block Country script error:", error);
-
-    // Track script errors
-    try {
-      fetch(`/apps/proxy-1/track_script_error`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          shop: Shopify.shop,
-          error_message: error.message,
-          error_stack: error.stack,
-          page_url: window.location.href,
-          user_agent: navigator.userAgent,
-        }),
       }).catch(() => {}); // Fail silently
-    } catch (trackingError) {
-      // Fail silently - don't break the store if tracking fails
     }
-  }
+  });
 })();

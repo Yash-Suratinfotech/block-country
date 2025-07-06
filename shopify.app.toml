@@ -3,12 +3,12 @@
 client_id = "bcbf9dfb209d9ceb441b2a8acb6a7a52"
 name = "Block Country"
 handle = "block-country-2"
-application_url = "https://block-country.onrender.com"
+application_url = "https://proof-required-threatened-angel.trycloudflare.com"
 embedded = true
 
 [build]
-include_config_on_deploy = true
 automatically_update_urls_on_dev = true
+include_config_on_deploy = true
 
 [webhooks]
 api_version = "2025-07"
@@ -18,13 +18,12 @@ api_version = "2025-07"
 scopes = ""
 
 [auth]
-redirect_urls = ["https://block-country.onrender.com/api/auth/callback", "https://block-country.onrender.com/auth/shopify/callback", "https://block-country.onrender.com/auth/callback"]
+redirect_urls = ["https://proof-required-threatened-angel.trycloudflare.com/auth/callback", "https://proof-required-threatened-angel.trycloudflare.com/auth/shopify/callback", "https://proof-required-threatened-angel.trycloudflare.com/api/auth/callback"]
 
 [app_proxy]
-url = "https://block-country.onrender.com/data/info"
+url = "https://proof-required-threatened-angel.trycloudflare.com/data/info"
 subpath = "proxy-1"
 prefix = "apps"
-
 
 [pos]
 embedded = false

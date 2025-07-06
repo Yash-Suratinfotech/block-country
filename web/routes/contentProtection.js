@@ -110,7 +110,7 @@ router.post("/content-protection", async (req, res) => {
   }
 });
 
-// Get content protection script for storefront
+// Enhanced content protection script generator
 router.get("/content-protection/script", async (req, res) => {
   const { shop } = req.query;
 
@@ -129,191 +129,540 @@ router.get("/content-protection/script", async (req, res) => {
       [shop]
     );
 
-    if (rows.length === 0) {
-      return res.json({
-        script: null,
-        message: "No content protection enabled",
-      });
+    if (rows.length === 0 || !hasAnyProtectionEnabled(rows[0])) {
+      res.setHeader("Content-Type", "application/javascript");
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.send("// No content protection enabled\nconsole.log('Content protection: disabled');");
+      return;
     }
 
     const settings = rows[0];
-    const script = generateProtectionScript(settings);
+    const script = generateEnhancedProtectionScript(settings);
 
     res.setHeader("Content-Type", "application/javascript");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.send(script);
   } catch (error) {
     console.error("Error generating content protection script:", error);
-    res.status(500).json({ error: "Failed to generate protection script" });
+    res.setHeader("Content-Type", "application/javascript");
+    res.send("// Error loading content protection\nconsole.error('Content protection script failed to load');");
   } finally {
     client.release();
   }
 });
 
-// Generate the protection script based on settings
-function generateProtectionScript(settings) {
+// Check if any protection is enabled
+function hasAnyProtectionEnabled(settings) {
+  return settings.disable_right_click ||
+         settings.disable_text_selection ||
+         settings.disable_image_drag ||
+         settings.disable_copy_paste ||
+         settings.disable_dev_tools;
+}
+
+// Generate comprehensive protection script
+function generateEnhancedProtectionScript(settings) {
   const protections = [];
+  const message = settings.custom_protection_message || "Content is protected";
 
   if (settings.disable_right_click) {
     protections.push(`
-      // Disable right-click context menu
-      document.addEventListener('contextmenu', function(e) {
-        e.preventDefault();
-        showProtectionMessage('${settings.custom_protection_message}');
-        return false;
-      });
+      // Enhanced right-click protection
+      function disableRightClick() {
+        document.addEventListener('contextmenu', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          showProtectionMessage('${message}');
+          return false;
+        }, true);
+        
+        // Block right-click on touch devices
+        document.addEventListener('touchstart', function(e) {
+          if (e.touches.length > 1) {
+            e.preventDefault();
+            showProtectionMessage('${message}');
+          }
+        }, { passive: false });
+        
+        // Block long press on mobile
+        document.addEventListener('touchend', function(e) {
+          e.preventDefault();
+        }, { passive: false });
+        
+        console.log('✓ Right-click protection enabled');
+      }
+      disableRightClick();
     `);
   }
 
   if (settings.disable_text_selection) {
     protections.push(`
-      // Disable text selection
-      document.addEventListener('selectstart', function(e) {
-        e.preventDefault();
-        return false;
-      });
-      
-      // CSS to disable text selection
-      const style = document.createElement('style');
-      style.textContent = \`
-        * {
-          -webkit-user-select: none !important;
-          -moz-user-select: none !important;
-          -ms-user-select: none !important;
-          user-select: none !important;
+      // Enhanced text selection protection
+      function disableTextSelection() {
+        // Prevent selection start
+        document.addEventListener('selectstart', function(e) {
+          if (e.target.tagName !== 'INPUT' && 
+              e.target.tagName !== 'TEXTAREA' && 
+              !e.target.isContentEditable) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        }, true);
+        
+        // Prevent mouse selection
+        document.addEventListener('mousedown', function(e) {
+          if (e.detail > 1 && 
+              e.target.tagName !== 'INPUT' && 
+              e.target.tagName !== 'TEXTAREA' && 
+              !e.target.isContentEditable) {
+            e.preventDefault();
+            return false;
+          }
+        }, true);
+        
+        // Apply CSS to disable selection
+        const selectionStyle = document.createElement('style');
+        selectionStyle.id = 'text-selection-protection';
+        selectionStyle.textContent = \`
+          * {
+            -webkit-user-select: none !important;
+            -moz-user-select: none !important;
+            -ms-user-select: none !important;
+            user-select: none !important;
+            -webkit-touch-callout: none !important;
+            -webkit-tap-highlight-color: transparent !important;
+          }
+          input, textarea, [contenteditable="true"] {
+            -webkit-user-select: text !important;
+            -moz-user-select: text !important;
+            -ms-user-select: text !important;
+            user-select: text !important;
+          }
+          ::selection {
+            background: transparent !important;
+          }
+          ::-moz-selection {
+            background: transparent !important;
+          }
+        \`;
+        
+        if (!document.getElementById('text-selection-protection')) {
+          document.head.appendChild(selectionStyle);
         }
-        input, textarea {
-          -webkit-user-select: text !important;
-          -moz-user-select: text !important;
-          -ms-user-select: text !important;
-          user-select: text !important;
-        }
-      \`;
-      document.head.appendChild(style);
+        
+        console.log('✓ Text selection protection enabled');
+      }
+      disableTextSelection();
     `);
   }
 
   if (settings.disable_image_drag) {
     protections.push(`
-      // Disable image dragging
-      document.addEventListener('dragstart', function(e) {
-        if (e.target.tagName === 'IMG') {
-          e.preventDefault();
-          showProtectionMessage('${settings.custom_protection_message}');
-          return false;
+      // Enhanced image drag protection
+      function disableImageDrag() {
+        // Prevent image dragging
+        document.addEventListener('dragstart', function(e) {
+          if (e.target.tagName === 'IMG' || e.target.tagName === 'PICTURE') {
+            e.preventDefault();
+            e.stopPropagation();
+            showProtectionMessage('${message}');
+            return false;
+          }
+        }, true);
+        
+        // Prevent image context menu on touch
+        document.addEventListener('touchstart', function(e) {
+          if (e.target.tagName === 'IMG' || e.target.tagName === 'PICTURE') {
+            e.preventDefault();
+          }
+        }, { passive: false });
+        
+        // Protect all images
+        function protectImages() {
+          const images = document.querySelectorAll('img, picture');
+          images.forEach(img => {
+            img.draggable = false;
+            img.ondragstart = function() { return false; };
+            img.onselectstart = function() { return false; };
+            img.oncontextmenu = function() { 
+              showProtectionMessage('${message}');
+              return false; 
+            };
+            
+            // Additional protection attributes
+            img.setAttribute('draggable', 'false');
+            img.setAttribute('ondragstart', 'return false;');
+            img.setAttribute('onselectstart', 'return false;');
+            img.setAttribute('oncontextmenu', 'return false;');
+            
+            // CSS protection
+            img.style.pointerEvents = 'none';
+            img.style.userSelect = 'none';
+            img.style.webkitUserSelect = 'none';
+            img.style.mozUserSelect = 'none';
+            img.style.msUserSelect = 'none';
+          });
         }
-      });
-      
-      // Make images non-draggable
-      document.addEventListener('DOMContentLoaded', function() {
-        const images = document.querySelectorAll('img');
-        images.forEach(img => {
-          img.draggable = false;
-          img.oncontextmenu = function() { return false; };
+        
+        // Protect existing images
+        protectImages();
+        
+        // Protect new images as they're added
+        const imageObserver = new MutationObserver(function(mutations) {
+          mutations.forEach(function(mutation) {
+            mutation.addedNodes.forEach(function(node) {
+              if (node.nodeType === 1) { // Element node
+                if (node.tagName === 'IMG' || node.tagName === 'PICTURE') {
+                  protectImages();
+                } else if (node.querySelectorAll) {
+                  const imgs = node.querySelectorAll('img, picture');
+                  if (imgs.length > 0) {
+                    protectImages();
+                  }
+                }
+              }
+            });
+          });
         });
-      });
+        
+        imageObserver.observe(document.body, { 
+          childList: true, 
+          subtree: true 
+        });
+        
+        console.log('✓ Image drag protection enabled');
+      }
+      disableImageDrag();
     `);
   }
 
   if (settings.disable_copy_paste) {
     protections.push(`
-      // Disable copy, cut, paste
-      document.addEventListener('keydown', function(e) {
-        // Disable Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+A, Ctrl+S, Ctrl+P
-        if (e.ctrlKey && (e.keyCode === 67 || e.keyCode === 86 || e.keyCode === 88 || 
-            e.keyCode === 65 || e.keyCode === 83 || e.keyCode === 80)) {
-          e.preventDefault();
-          showProtectionMessage('${settings.custom_protection_message}');
-          return false;
-        }
-      });
-      
-      document.addEventListener('copy', function(e) {
-        e.preventDefault();
-        showProtectionMessage('${settings.custom_protection_message}');
-      });
-      
-      document.addEventListener('cut', function(e) {
-        e.preventDefault();
-        showProtectionMessage('${settings.custom_protection_message}');
-      });
-      
-      document.addEventListener('paste', function(e) {
-        e.preventDefault();
-        showProtectionMessage('${settings.custom_protection_message}');
-      });
+      // Enhanced copy/paste protection
+      function disableCopyPaste() {
+        const protectedKeys = {
+          67: 'copy',     // Ctrl+C
+          86: 'paste',    // Ctrl+V  
+          88: 'cut',      // Ctrl+X
+          65: 'select all', // Ctrl+A
+          83: 'save',     // Ctrl+S
+          80: 'print',    // Ctrl+P
+          70: 'find'      // Ctrl+F
+        };
+        
+        // Keyboard protection
+        document.addEventListener('keydown', function(e) {
+          const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+          const cmdKey = isMac ? e.metaKey : e.ctrlKey;
+          
+          if (cmdKey && protectedKeys[e.keyCode]) {
+            // Allow in input/textarea fields and contenteditable
+            if (e.target.tagName !== 'INPUT' && 
+                e.target.tagName !== 'TEXTAREA' && 
+                !e.target.isContentEditable) {
+              e.preventDefault();
+              e.stopPropagation();
+              e.stopImmediatePropagation();
+              showProtectionMessage('${message}');
+              return false;
+            }
+          }
+          
+          // Block F12 and other dev shortcuts
+          if (e.keyCode === 123 || // F12
+              (e.keyCode === 116) || // F5 refresh
+              (cmdKey && e.shiftKey && e.keyCode === 73) || // Ctrl+Shift+I
+              (cmdKey && e.shiftKey && e.keyCode === 74) || // Ctrl+Shift+J
+              (cmdKey && e.shiftKey && e.keyCode === 67) || // Ctrl+Shift+C
+              (cmdKey && e.keyCode === 85)) { // Ctrl+U
+            e.preventDefault();
+            e.stopPropagation();
+            showProtectionMessage('Developer tools are disabled');
+            return false;
+          }
+        }, true);
+        
+        // Clipboard events protection
+        ['copy', 'cut', 'paste'].forEach(event => {
+          document.addEventListener(event, function(e) {
+            if (e.target.tagName !== 'INPUT' && 
+                e.target.tagName !== 'TEXTAREA' && 
+                !e.target.isContentEditable) {
+              e.preventDefault();
+              e.stopPropagation();
+              showProtectionMessage('${message}');
+            }
+          }, true);
+        });
+        
+        console.log('✓ Copy/paste protection enabled');
+      }
+      disableCopyPaste();
     `);
   }
 
   if (settings.disable_dev_tools) {
     protections.push(`
-      // Disable common developer tools shortcuts
-      document.addEventListener('keydown', function(e) {
-        // F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U, Ctrl+Shift+C
-        if (e.keyCode === 123 || 
-            (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) ||
-            (e.ctrlKey && e.keyCode === 85)) {
-          e.preventDefault();
-          showProtectionMessage('Developer tools are disabled');
-          return false;
+      // Enhanced developer tools protection
+      function disableDevTools() {
+        let devtools = {
+          open: false,
+          orientation: null
+        };
+        
+        // Console protection
+        (function() {
+          let devtools_detect = false;
+          Object.defineProperty(window, 'console', {
+            get: function() {
+              if (!devtools_detect) {
+                devtools_detect = true;
+                showProtectionMessage('Console access is disabled');
+              }
+              return {
+                log: function() {},
+                error: function() {},
+                warn: function() {},
+                info: function() {},
+                debug: function() {},
+                clear: function() {},
+                dir: function() {},
+                dirxml: function() {},
+                table: function() {},
+                trace: function() {},
+                group: function() {},
+                groupCollapsed: function() {},
+                groupEnd: function() {},
+                time: function() {},
+                timeEnd: function() {},
+                timeStamp: function() {},
+                profile: function() {},
+                profileEnd: function() {},
+                count: function() {}
+              };
+            },
+            configurable: false
+          });
+        })();
+        
+        // DevTools detection via window size
+        const threshold = 160;
+        let checkCount = 0;
+        
+        function detectDevTools() {
+          const widthThreshold = window.outerWidth - window.innerWidth > threshold;
+          const heightThreshold = window.outerHeight - window.innerHeight > threshold;
+          
+          if (widthThreshold || heightThreshold) {
+            if (!devtools.open) {
+              devtools.open = true;
+              document.body.innerHTML = \`
+                <div style="
+                  position: fixed;
+                  top: 0;
+                  left: 0;
+                  width: 100%;
+                  height: 100%;
+                  background: #000;
+                  color: #fff;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-family: Arial, sans-serif;
+                  font-size: 24px;
+                  z-index: 999999;
+                  text-align: center;
+                  flex-direction: column;
+                ">
+                  <h1 style="color: #ff4444; margin-bottom: 20px;">⚠️ Developer Tools Detected</h1>
+                  <p>Please close developer tools to continue browsing.</p>
+                  <p style="font-size: 16px; color: #ccc; margin-top: 20px;">This page will reload automatically when tools are closed.</p>
+                </div>
+              \`;
+            }
+          } else {
+            if (devtools.open) {
+              devtools.open = false;
+              window.location.reload();
+            }
+          }
         }
-      });
-      
-      // Detect if developer tools are open (basic detection)
-      setInterval(function() {
-        if (window.outerHeight - window.innerHeight > 200 || 
-            window.outerWidth - window.innerWidth > 200) {
-          document.body.innerHTML = '<div style="text-align:center;margin-top:20%;font-size:24px;">Developer tools detected. Please close them to continue.</div>';
+        
+        // Check every 100ms for faster detection
+        setInterval(detectDevTools, 100);
+        
+        // Debug detection via timing
+        let startTime = performance.now();
+        debugger;
+        let endTime = performance.now();
+        
+        if (endTime - startTime > 100) {
+          showProtectionMessage('Debugging detected');
         }
-      }, 1000);
+        
+        // Prevent common debugging
+        setInterval(function() {
+          debugger;
+        }, 1000);
+        
+        console.log('✓ Developer tools protection enabled');
+      }
+      disableDevTools();
     `);
   }
 
-  // Add the protection message function
+  // Enhanced protection message function with better UX
   const messageFunction = `
+    let messageQueue = [];
+    let messageDisplaying = false;
+    
     function showProtectionMessage(message) {
+      // Add to queue if another message is displaying
+      if (messageDisplaying) {
+        if (!messageQueue.includes(message)) {
+          messageQueue.push(message);
+        }
+        return;
+      }
+      
+      messageDisplaying = true;
+      
       // Remove existing message
       const existingMessage = document.getElementById('protection-message');
       if (existingMessage) {
         existingMessage.remove();
       }
       
-      // Create and show message
+      // Create enhanced message with better styling
       const messageDiv = document.createElement('div');
       messageDiv.id = 'protection-message';
       messageDiv.style.cssText = \`
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #ff4444;
-        color: white;
-        padding: 10px 20px;
-        border-radius: 4px;
-        z-index: 10000;
-        font-family: Arial, sans-serif;
-        font-size: 14px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        position: fixed !important;
+        top: 20px !important;
+        right: 20px !important;
+        background: linear-gradient(135deg, #ff4444, #cc0000) !important;
+        color: white !important;
+        padding: 16px 24px !important;
+        border-radius: 12px !important;
+        z-index: 2147483647 !important;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 2px 8px rgba(255,68,68,0.4) !important;
+        transform: translateX(100%) !important;
+        transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+        max-width: 320px !important;
+        word-wrap: break-word !important;
+        pointer-events: none !important;
+        user-select: none !important;
+        border: 2px solid rgba(255,255,255,0.2) !important;
+        backdrop-filter: blur(10px) !important;
       \`;
-      messageDiv.textContent = message;
+      
+      // Add icon and text
+      messageDiv.innerHTML = \`
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 16px;">🛡️</span>
+          <span>\${message}</span>
+        </div>
+      \`;
+      
       document.body.appendChild(messageDiv);
       
-      // Auto-remove after 3 seconds
+      // Animate in
+      requestAnimationFrame(() => {
+        messageDiv.style.transform = 'translateX(0) !important';
+      });
+      
+      // Auto-remove after 4 seconds with animation
       setTimeout(() => {
-        if (messageDiv.parentNode) {
-          messageDiv.parentNode.removeChild(messageDiv);
-        }
-      }, 3000);
+        messageDiv.style.transform = 'translateX(100%) !important';
+        messageDiv.style.opacity = '0 !important';
+        
+        setTimeout(() => {
+          if (messageDiv.parentNode) {
+            messageDiv.parentNode.removeChild(messageDiv);
+          }
+          messageDisplaying = false;
+          
+          // Show next message in queue
+          if (messageQueue.length > 0) {
+            const nextMessage = messageQueue.shift();
+            setTimeout(() => showProtectionMessage(nextMessage), 100);
+          }
+        }, 400);
+      }, 4000);
     }
   `;
 
+  // Main script wrapper
   return `
     (function() {
       'use strict';
       
+      // Check if protection already loaded
+      if (window.contentProtectionLoaded) {
+        console.log('Content protection already loaded');
+        return;
+      }
+      
+      window.contentProtectionLoaded = true;
+      
       ${messageFunction}
       
-      ${protections.join("\n")}
+      // Initialize protection when DOM is ready
+      function initProtection() {
+        try {
+          ${protections.join('\n')}
+          
+          // Log successful initialization
+          console.log('🛡️ Content protection initialized successfully');
+          
+          // Notify that protection is active
+          const event = new CustomEvent('contentProtectionLoaded', {
+            detail: { 
+              enabled: true,
+              features: [
+                ${settings.disable_right_click ? "'right-click'" : ''}
+                ${settings.disable_text_selection ? ",'text-selection'" : ''}
+                ${settings.disable_image_drag ? ",'image-drag'" : ''}
+                ${settings.disable_copy_paste ? ",'copy-paste'" : ''}
+                ${settings.disable_dev_tools ? ",'dev-tools'" : ''}
+              ].filter(Boolean)
+            }
+          });
+          window.dispatchEvent(event);
+          
+        } catch (error) {
+          console.error('Content protection initialization error:', error);
+        }
+      }
       
-      console.log('Content protection active');
+      // Initialize based on document state
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initProtection);
+      } else {
+        initProtection();
+      }
+      
+      // Re-initialize on page changes (for SPAs)
+      let currentUrl = window.location.href;
+      const urlObserver = new MutationObserver(() => {
+        if (window.location.href !== currentUrl) {
+          currentUrl = window.location.href;
+          setTimeout(initProtection, 100);
+        }
+      });
+      
+      urlObserver.observe(document.body, { 
+        childList: true, 
+        subtree: true 
+      });
+      
     })();
   `;
 }
