@@ -587,10 +587,7 @@ export default function EnhancedIPBlocker() {
                       <strong>Blacklist:</strong> Blocks access from specified IP addresses
                     </Text>
                     <Text as="p" variant="bodyMd" tone="subdued">
-                      <strong>Whitelist:</strong> Allows access only from specified IP addresses
-                    </Text>
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                      <strong>Mixed Mode:</strong> Whitelist rules take precedence over blacklist
+                      <strong>Whitelist:</strong> Allows access only from specified IP addresses and take precedence over blacklist country rules
                     </Text>
                     <Text as="p" variant="bodyMd" tone="subdued">
                       <strong>IPv4 & IPv6:</strong> Both IP address formats are supported

@@ -117,6 +117,79 @@ export default function Analytics() {
     }
   };
 
+  const parseDashboardNumbers = (data) => {
+    if (data.overview) {
+      data.overview.total_visits = Number(data.overview.total_visits || 0);
+      data.overview.unique_sessions = Number(data.overview.unique_sessions || 0);
+      data.overview.unique_visitors = Number(data.overview.unique_visitors || 0);
+      data.overview.avg_duration = Math.round(Number(data.overview.avg_duration || 0));
+      data.overview.total_page_views = Number(data.overview.total_page_views || 0);
+      data.overview.bot_visits = Number(data.overview.bot_visits || 0);
+      data.overview.blocked_visits = Number(data.overview.blocked_visits || 0);
+    }
+    if (data.topCountries) {
+      data.topCountries = data.topCountries.map((country) => ({
+        ...country,
+        visits: Number(country.visits || 0),
+        unique_sessions: Number(country.unique_sessions || 0),
+        blocked_visits: Number(country.blocked_visits || 0),
+      }));
+    }
+    if (data.deviceStats) {
+      data.deviceStats = data.deviceStats.map((device) => ({
+        ...device,
+        visits: Number(device.visits || 0),
+        unique_sessions: Number(device.unique_sessions || 0),
+        avg_duration: Math.round(Number(device.avg_duration || 0)),
+      }));
+    }
+    if (data.topPages) {
+      data.topPages = data.topPages.map((page) => ({
+        ...page,
+        visits: Number(page.visits || 0),
+        unique_sessions: Number(page.unique_sessions || 0),
+        avg_duration: Math.round(Number(page.avg_duration || 0)),
+      }));
+    }
+    return data;
+  };
+
+  const parseBlockingNumbers = (data) => {
+    if (data.blockingReasons) {
+      data.blockingReasons = data.blockingReasons.map((reason) => ({
+        ...reason,
+        count: Number(reason.count || 0),
+      }));
+    }
+    if (data.blockedCountries) {
+      data.blockedCountries = data.blockedCountries.map((country) => ({
+        ...country,
+        blocked_attempts: Number(country.blocked_attempts || 0),
+      }));
+    }
+    if (data.blockedIPs) {
+      data.blockedIPs = data.blockedIPs.map((ip) => ({
+        ...ip,
+        blocked_attempts: Number(ip.blocked_attempts || 0),
+      }));
+    }
+    if (data.blockedBots) {
+      data.blockedBots = data.blockedBots.map((bot) => ({
+        ...bot,
+        blocked_attempts: Number(bot.blocked_attempts || 0),
+      }));
+    }
+    if (data.dailyBlocking) {
+      data.dailyBlocking = data.dailyBlocking.map((row) => ({
+        ...row,
+        country_blocks: Number(row.country_blocks || 0),
+        ip_blocks: Number(row.ip_blocks || 0),
+        bot_blocks: Number(row.bot_blocks || 0),
+      }));
+    }
+    return data;
+  };
+
   const loadDashboardData = async () => {
     setLoadingStates((prev) => ({ ...prev, dashboard: true }));
     try {
@@ -124,23 +197,8 @@ export default function Analytics() {
         `/api/analytics/dashboard?shop=${shop}&days=${timeRange}`
       );
       if (response.ok) {
-        const data = await response.json();
-
-        // Fix duration calculations
-        if (data.overview) {
-          data.overview.avg_duration = Math.round(
-            data.overview.avg_duration || 0
-          );
-        }
-
-        // Fix page data duration calculations
-        if (data.topPages) {
-          data.topPages = data.topPages.map((page) => ({
-            ...page,
-            avg_duration: Math.round(page.avg_duration || 0),
-          }));
-        }
-
+        let data = await response.json();
+        data = parseDashboardNumbers(data);
         setDashboardData(data);
       }
     } catch (error) {
@@ -183,7 +241,8 @@ export default function Analytics() {
         `/api/analytics/blocking?shop=${shop}&days=${timeRange}`
       );
       if (response.ok) {
-        const data = await response.json();
+        let data = await response.json();
+        data = parseBlockingNumbers(data);
         setBlockingData(data);
       }
     } catch (error) {
@@ -505,6 +564,8 @@ export default function Analytics() {
                     "text",
                     "text",
                     "text",
+                    "text",
+                    "text",
                   ]}
                   headings={[
                     "IP Address",
@@ -512,7 +573,9 @@ export default function Analytics() {
                     "Device",
                     "Browser",
                     "Duration",
+                    "Page Views",
                     "Status",
+                    "Time",
                   ]}
                   rows={visitorsData.visitors.map((visitor) => [
                     visitor.ip_address || "Unknown",
@@ -530,6 +593,7 @@ export default function Analytics() {
                     </Badge>,
                     visitor.browser_name || "Unknown",
                     formatDuration(visitor.visit_duration),
+                    formatDuration(visitor.page_views),
                     visitor.blocked_reason ? (
                       <Badge tone="critical">Blocked</Badge>
                     ) : visitor.is_bot ? (
@@ -537,6 +601,7 @@ export default function Analytics() {
                     ) : (
                       <Badge tone="success">Allowed</Badge>
                     ),
+                    new Date(visitor.created_at).toLocaleTimeString(),
                   ])}
                 />
               )}

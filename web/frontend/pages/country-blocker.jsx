@@ -624,9 +624,6 @@ export default function EnhancedCountryBlocker() {
                       <strong>Whitelist:</strong> Allows access only from specified countries
                     </Text>
                     <Text as="p" variant="bodyMd" tone="subdued">
-                      <strong>Mixed Mode:</strong> Whitelist rules take precedence over blacklist
-                    </Text>
-                    <Text as="p" variant="bodyMd" tone="subdued">
                       <strong>Redirects:</strong> Send blocked users to a custom URL instead of showing a block message
                     </Text>
                     <Text as="p" variant="bodyMd" tone="subdued">

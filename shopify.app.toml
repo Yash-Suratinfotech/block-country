@@ -3,7 +3,7 @@
 client_id = "bcbf9dfb209d9ceb441b2a8acb6a7a52"
 name = "Block Country"
 handle = "block-country-2"
-application_url = "https://issues-evidence-exchange-asus.trycloudflare.com"
+application_url = "https://block-country.onrender.com"
 embedded = true
 
 [build]
@@ -18,10 +18,10 @@ api_version = "2025-07"
 scopes = ""
 
 [auth]
-redirect_urls = ["https://issues-evidence-exchange-asus.trycloudflare.com/auth/callback", "https://issues-evidence-exchange-asus.trycloudflare.com/auth/shopify/callback", "https://issues-evidence-exchange-asus.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://block-country.onrender.com/api/auth/callback", "https://block-country.onrender.com/auth/shopify/callback", "https://block-country.onrender.com/auth/callback"]
 
 [app_proxy]
-url = "https://issues-evidence-exchange-asus.trycloudflare.com/data/info"
+url = "https://block-country.onrender.com/data/info"
 subpath = "proxy-1"
 prefix = "apps"
 
