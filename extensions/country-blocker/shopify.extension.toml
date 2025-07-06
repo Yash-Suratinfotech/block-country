@@ -1,3 +1,12 @@
 name = "country-blocker"
 type = "theme"
 
+[dependencies]
+javascript = [
+  "assets/app.js",
+  "assets/session-tracking.js",
+  "assets/access-checker.js",
+  "assets/analytics-tracker.js",
+  "assets/detection-utils.js",
+  "assets/ip-detection.js"
+]

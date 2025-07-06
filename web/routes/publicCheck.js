@@ -1,7 +1,7 @@
 // web/routes/publicCheck.js
 import express from "express";
 import db from "../db.js";
-import { getClientIp, normalizeIp } from "../utils/ipUtils.js";
+import { normalizeIp } from "../utils/ipUtils.js";
 
 const router = express.Router();
 
@@ -32,183 +32,6 @@ function getEnhancedClientIP(req) {
   return null;
 }
 
-// Enhanced country check with whitelist/blacklist support
-router.get("/check_country", async (req, res) => {
-  const { shop, country } = req.query;
-
-  if (!shop || !country) {
-    return res.status(400).json({ error: "Missing required parameters" });
-  }
-
-  const client = await db.getClient();
-
-  try {
-    await client.query("BEGIN");
-
-    // Get all country rules for this shop
-    const countryRules = await client.query(
-      `
-      SELECT list_type, redirect_url, country_code
-      FROM blocked_countries 
-      WHERE shop_domain = $1
-      ORDER BY list_type DESC
-    `,
-      [shop]
-    );
-
-    let blocked = false;
-    let redirectUrl = null;
-    let reason = null;
-
-    // Check if we have any rules
-    if (countryRules.rows.length === 0) {
-      // No rules = allow all
-      blocked = false;
-    } else {
-      // Check for whitelist rules first
-      const whitelistRules = countryRules.rows.filter(
-        (r) => r.list_type === "whitelist"
-      );
-      const blacklistRules = countryRules.rows.filter(
-        (r) => r.list_type === "blacklist"
-      );
-
-      if (whitelistRules.length > 0) {
-        // Whitelist mode: only allow countries in whitelist
-        const isWhitelisted = whitelistRules.some(
-          (r) => r.country_code === country
-        );
-        if (!isWhitelisted) {
-          blocked = true;
-          reason = `Country ${country} not in whitelist`;
-          // Get default redirect from settings
-          const settingsResult = await client.query(
-            "SELECT redirect_url FROM country_settings WHERE shop_domain = $1",
-            [shop]
-          );
-          redirectUrl = settingsResult.rows[0]?.redirect_url || null;
-        }
-      } else if (blacklistRules.length > 0) {
-        // Blacklist mode: block countries in blacklist
-        const blacklistedRule = blacklistRules.find(
-          (r) => r.country_code === country
-        );
-        if (blacklistedRule) {
-          blocked = true;
-          reason = `Country ${country} is blacklisted`;
-          redirectUrl = blacklistedRule.redirect_url;
-        }
-      }
-    }
-
-    await client.query("COMMIT");
-    res.status(200).json({
-      blocked,
-      reason,
-      redirect_url: redirectUrl,
-      country_code: country,
-    });
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("Error checking country:", error);
-    res.status(500).json({ error: "Internal server error" });
-  } finally {
-    client.release();
-  }
-});
-
-// Enhanced IP check with whitelist/blacklist support
-router.get("/check_ip", async (req, res) => {
-  const { shop } = req.query;
-
-  if (!shop) {
-    return res.status(400).json({ error: "Missing shop parameter" });
-  }
-
-  const clientIp = getEnhancedClientIP(req);
-
-  if (!clientIp) {
-    return res.status(400).json({ error: "Could not determine IP address" });
-  }
-
-  const client = await db.getClient();
-
-  try {
-    await client.query("BEGIN");
-
-    // Get all IP rules for this shop
-    const ipRules = await client.query(
-      `
-      SELECT list_type, redirect_url, note, ip_address
-      FROM blocked_ips 
-      WHERE shop_domain = $1
-      ORDER BY list_type DESC
-    `,
-      [shop]
-    );
-
-    let blocked = false;
-    let redirectUrl = null;
-    let reason = null;
-
-    // Check if we have any rules
-    if (ipRules.rows.length === 0) {
-      // No rules = allow all
-      blocked = false;
-    } else {
-      // Check for whitelist rules first
-      const whitelistRules = ipRules.rows.filter(
-        (r) => r.list_type === "whitelist"
-      );
-      const blacklistRules = ipRules.rows.filter(
-        (r) => r.list_type === "blacklist"
-      );
-
-      if (whitelistRules.length > 0) {
-        // Whitelist mode: only allow IPs in whitelist
-        const isWhitelisted = whitelistRules.some(
-          (r) => r.ip_address === clientIp
-        );
-        if (!isWhitelisted) {
-          blocked = true;
-          reason = `IP ${clientIp} not in whitelist`;
-          // Get default redirect from settings
-          const settingsResult = await client.query(
-            "SELECT redirect_url FROM ip_settings WHERE shop_domain = $1",
-            [shop]
-          );
-          redirectUrl = settingsResult.rows[0]?.redirect_url || null;
-        }
-      } else if (blacklistRules.length > 0) {
-        // Blacklist mode: block IPs in blacklist
-        const blacklistedRule = blacklistRules.find(
-          (r) => r.ip_address === clientIp
-        );
-        if (blacklistedRule) {
-          blocked = true;
-          reason = blacklistedRule.note || `IP ${clientIp} is blacklisted`;
-          redirectUrl = blacklistedRule.redirect_url;
-        }
-      }
-    }
-
-    await client.query("COMMIT");
-    res.status(200).json({
-      blocked,
-      reason,
-      redirect_url: redirectUrl,
-      ip: clientIp,
-    });
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("Error checking IP:", error);
-    res.status(500).json({ error: "Internal server error" });
-  } finally {
-    client.release();
-  }
-});
-
-// Fixed and enhanced combined access check
 router.get("/check_access_enhanced", async (req, res) => {
   const {
     shop,
@@ -220,6 +43,8 @@ router.get("/check_access_enhanced", async (req, res) => {
     page_url,
     referrer,
     client_ip,
+    bot_name,
+    user_agent,
   } = req.query;
 
   if (!shop) {
@@ -240,120 +65,126 @@ router.get("/check_access_enhanced", async (req, res) => {
     let redirectUrl = null;
     let customMessage = null;
 
-    // 1. Check country blocking (if country provided)
-    if (country && !blocked) {
-      const countryRules = await client.query(
+    // 1. Check if IP is whitelisted (takes precedence)
+    let ipWhitelisted = false;
+    if (clientIp) {
+      const ipWhitelistResult = await client.query(
         `
-        SELECT list_type, redirect_url, country_code
-        FROM blocked_countries 
-        WHERE shop_domain = $1
-        ORDER BY list_type DESC
-      `,
-        [shop]
+        SELECT 1 FROM blocked_ips 
+        WHERE shop_domain = $1 AND ip_address = $2 AND list_type = 'whitelist'
+        LIMIT 1
+        `,
+        [shop, clientIp]
       );
+      ipWhitelisted = ipWhitelistResult.rows.length > 0;
+    }
 
-      if (countryRules.rows.length > 0) {
-        const whitelistRules = countryRules.rows.filter(
-          (r) => r.list_type === "whitelist"
+    if (ipWhitelisted) {
+      blocked = false;
+      blockReason = null;
+      // Optionally, you can set a reason like "IP whitelisted"
+    } else {
+      // 2. Check country blocking (if country provided)
+      if (country && !blocked) {
+        const countryResult = await client.query(
+          `
+          SELECT list_type, redirect_url
+          FROM blocked_countries 
+          WHERE shop_domain = $1 AND country_code = $2
+          LIMIT 1
+        `,
+          [shop, country]
         );
-        const blacklistRules = countryRules.rows.filter(
-          (r) => r.list_type === "blacklist"
+
+        // Check if whitelist mode is active
+        const whitelistCount = await client.query(
+          `
+          SELECT COUNT(*) as count, 
+                 (SELECT redirect_url FROM country_settings WHERE shop_domain = $1) as redirect_url,
+                 (SELECT custom_message FROM country_settings WHERE shop_domain = $1) as custom_message
+          FROM blocked_countries 
+          WHERE shop_domain = $1 AND list_type = 'whitelist'
+        `,
+          [shop]
         );
 
-        if (whitelistRules.length > 0) {
-          // Whitelist mode
-          const isWhitelisted = whitelistRules.some(
-            (r) => r.country_code === country
-          );
-          if (!isWhitelisted) {
-            blocked = true;
-            blockReason = `Country not in whitelist: ${country}`;
+        const hasWhitelistMode = parseInt(whitelistCount.rows[0].count) > 0;
 
-            const settingsResult = await client.query(
-              "SELECT redirect_url, custom_message FROM country_settings WHERE shop_domain = $1",
-              [shop]
-            );
-            if (settingsResult.rows.length > 0) {
-              redirectUrl = settingsResult.rows[0].redirect_url;
-              customMessage = settingsResult.rows[0].custom_message;
-            }
-          }
-        } else if (blacklistRules.length > 0) {
-          // Blacklist mode
-          const blacklistedRule = blacklistRules.find(
-            (r) => r.country_code === country
-          );
-          if (blacklistedRule) {
+        if (countryResult.rows.length > 0) {
+          const rule = countryResult.rows[0];
+          if (rule.list_type === "blacklist") {
             blocked = true;
             blockReason = `Country blocked: ${country}`;
-            redirectUrl = blacklistedRule.redirect_url;
+            redirectUrl =
+              rule.redirect_url || whitelistCount.rows[0]?.redirect_url;
+            customMessage = whitelistCount.rows[0]?.custom_message;
           }
+        } else if (hasWhitelistMode) {
+          // Country not in whitelist
+          blocked = true;
+          blockReason = `Country not in whitelist: ${country}`;
+          redirectUrl = whitelistCount.rows[0]?.redirect_url;
+          customMessage = whitelistCount.rows[0]?.custom_message;
+        }
+      }
+
+      // 3. Check IP blacklist (if not already blocked and IP available)
+      if (!blocked && clientIp) {
+        const ipResult = await client.query(
+          `
+          SELECT list_type, redirect_url, note
+          FROM blocked_ips 
+          WHERE shop_domain = $1 AND ip_address = $2
+          LIMIT 1
+        `,
+          [shop, clientIp]
+        );
+
+        // Check if whitelist mode is active
+        const ipWhitelistCount = await client.query(
+          `
+          SELECT COUNT(*) as count,
+                 (SELECT redirect_url FROM ip_settings WHERE shop_domain = $1) as redirect_url,
+                 (SELECT custom_message FROM ip_settings WHERE shop_domain = $1) as custom_message
+          FROM blocked_ips 
+          WHERE shop_domain = $1 AND list_type = 'whitelist'
+        `,
+          [shop]
+        );
+
+        const hasIpWhitelistMode = parseInt(ipWhitelistCount.rows[0].count) > 0;
+
+        if (ipResult.rows.length > 0) {
+          const rule = ipResult.rows[0];
+          if (rule.list_type === "blacklist") {
+            blocked = true;
+            blockReason = rule.note || `IP blocked: ${clientIp}`;
+            redirectUrl =
+              rule.redirect_url || ipWhitelistCount.rows[0]?.redirect_url;
+            customMessage = ipWhitelistCount.rows[0]?.custom_message;
+          }
+        } else if (hasIpWhitelistMode) {
+          // IP not in whitelist
+          blocked = true;
+          blockReason = `IP not in whitelist: ${clientIp}`;
+          redirectUrl = ipWhitelistCount.rows[0]?.redirect_url;
+          customMessage = ipWhitelistCount.rows[0]?.custom_message;
         }
       }
     }
 
-    // 2. Check IP blocking (if not already blocked and IP available)
-    if (!blocked && clientIp) {
-      const ipRules = await client.query(
-        `
-        SELECT list_type, redirect_url, note, ip_address
-        FROM blocked_ips 
-        WHERE shop_domain = $1
-        ORDER BY list_type DESC
-      `,
-        [shop]
-      );
-
-      if (ipRules.rows.length > 0) {
-        const whitelistRules = ipRules.rows.filter(
-          (r) => r.list_type === "whitelist"
-        );
-        const blacklistRules = ipRules.rows.filter(
-          (r) => r.list_type === "blacklist"
-        );
-
-        if (whitelistRules.length > 0) {
-          // Whitelist mode
-          const isWhitelisted = whitelistRules.some(
-            (r) => r.ip_address === clientIp
-          );
-          if (!isWhitelisted) {
-            blocked = true;
-            blockReason = `IP not in whitelist: ${clientIp}`;
-
-            const settingsResult = await client.query(
-              "SELECT redirect_url, custom_message FROM ip_settings WHERE shop_domain = $1",
-              [shop]
-            );
-            if (settingsResult.rows.length > 0) {
-              redirectUrl = settingsResult.rows[0].redirect_url;
-              customMessage = settingsResult.rows[0].custom_message;
-            }
-          }
-        } else if (blacklistRules.length > 0) {
-          // Blacklist mode
-          const blacklistedRule = blacklistRules.find(
-            (r) => r.ip_address === clientIp
-          );
-          if (blacklistedRule) {
-            blocked = true;
-            blockReason = blacklistedRule.note || `IP blocked: ${clientIp}`;
-            redirectUrl = blacklistedRule.redirect_url;
-          }
-        }
-      }
-    }
-
-    // 3. Check bot blocking (if not already blocked)
+    // 4. Check bot blocking (if not already blocked)
     if (!blocked && is_bot === "true") {
-      const userAgent = req.headers["user-agent"] || "";
+      const userAgentToCheck = user_agent || req.headers["user-agent"] || "";
+      const botNameToCheck = bot_name || "Unknown Bot";
 
-      // Get bot rules for this shop
+      // Get bot rules
       const botRules = await client.query(
         `
         SELECT list_type, bot_name, user_agent_pattern
         FROM bot_settings 
-        WHERE shop_domain IN ($1, '*') AND is_enabled = true
+        WHERE (shop_domain = $1 OR shop_domain = '*') 
+          AND is_enabled = true
         ORDER BY 
           CASE WHEN shop_domain = $1 THEN 0 ELSE 1 END,
           list_type DESC
@@ -362,34 +193,42 @@ router.get("/check_access_enhanced", async (req, res) => {
       );
 
       if (botRules.rows.length > 0) {
-        const lowerUserAgent = userAgent.toLowerCase();
+        const lowerUserAgent = userAgentToCheck.toLowerCase();
 
-        // Find matching bot rule
-        const matchingRule = botRules.rows.find((rule) =>
-          lowerUserAgent.includes(rule.user_agent_pattern.toLowerCase())
+        // Separate whitelist and blacklist rules
+        const whitelistRules = botRules.rows.filter(
+          (r) => r.list_type === "whitelist"
         );
+        const blacklistRules = botRules.rows.filter(
+          (r) => r.list_type === "blacklist"
+        );
+
+        // Find matching rule
+        let matchingRule = null;
+        for (const rule of botRules.rows) {
+          if (lowerUserAgent.includes(rule.user_agent_pattern.toLowerCase())) {
+            matchingRule = rule;
+            break;
+          }
+        }
 
         if (matchingRule) {
           if (matchingRule.list_type === "blacklist") {
             blocked = true;
             blockReason = `Bot blocked: ${
-              matchingRule.bot_name || "Unknown bot"
+              matchingRule.bot_name || botNameToCheck
             }`;
           }
-        } else {
-          // No rule found - check if we have any whitelist rules
-          const hasWhitelistRules = botRules.rows.some(
-            (r) => r.list_type === "whitelist"
-          );
-          if (hasWhitelistRules) {
-            blocked = true;
-            blockReason = "Unknown bot - not in whitelist";
-          }
+          // If whitelisted, explicitly allow (don't block)
+        } else if (whitelistRules.length > 0) {
+          // Has whitelist rules but bot not in whitelist
+          blocked = true;
+          blockReason = `Bot not in whitelist: ${botNameToCheck}`;
         }
       }
     }
 
-    // 4. Check content protection settings
+    // 5. Check content protection settings
     const protectionResult = await client.query(
       "SELECT * FROM content_protection_settings WHERE shop_domain = $1",
       [shop]
@@ -401,10 +240,10 @@ router.get("/check_access_enhanced", async (req, res) => {
         .filter(([key]) => key.startsWith("disable_"))
         .some(([, value]) => value === true);
 
-    // 5. Enhanced analytics logging with better session handling
+    // 6. Enhanced analytics logging with accurate session tracking
     try {
       if (session_id) {
-        // Check if this is an existing session
+        // Check for existing session (within 4 hours)
         const existingSession = await client.query(
           `
           SELECT id, page_views, visit_duration, created_at
@@ -418,7 +257,7 @@ router.get("/check_access_enhanced", async (req, res) => {
         );
 
         if (existingSession.rows.length > 0) {
-          // Update existing session
+          // Update existing session - calculate accurate duration
           const sessionStart = new Date(existingSession.rows[0].created_at);
           const currentDuration = Math.round(
             (Date.now() - sessionStart.getTime()) / 1000
@@ -430,10 +269,16 @@ router.get("/check_access_enhanced", async (req, res) => {
             SET page_views = page_views + 1,
                 visit_duration = $1,
                 page_url = $2,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = $3
+                updated_at = CURRENT_TIMESTAMP,
+                blocked_reason = COALESCE($3, blocked_reason)
+            WHERE id = $4
           `,
-            [currentDuration, page_url, existingSession.rows[0].id]
+            [
+              currentDuration,
+              page_url,
+              blocked ? blockReason : null,
+              existingSession.rows[0].id,
+            ]
           );
         } else {
           // Create new session record
@@ -442,8 +287,8 @@ router.get("/check_access_enhanced", async (req, res) => {
             INSERT INTO user_analytics (
               shop_domain, session_id, ip_address, country_code, 
               device_type, browser_name, page_url, referrer, 
-              is_bot, blocked_reason, user_agent, page_views
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 1)
+              is_bot, bot_name, blocked_reason, user_agent, page_views, visit_duration
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 1, 0)
           `,
             [
               shop,
@@ -455,8 +300,9 @@ router.get("/check_access_enhanced", async (req, res) => {
               page_url,
               referrer,
               is_bot === "true",
+              bot_name,
               blocked ? blockReason : null,
-              req.headers["user-agent"] || "",
+              user_agent || req.headers["user-agent"] || "",
             ]
           );
         }
@@ -468,7 +314,7 @@ router.get("/check_access_enhanced", async (req, res) => {
 
     await client.query("COMMIT");
 
-    // 6. Return comprehensive response
+    // 7. Return comprehensive response
     const response = {
       blocked,
       reason: blockReason,
@@ -479,8 +325,12 @@ router.get("/check_access_enhanced", async (req, res) => {
       debug: {
         clientIp: clientIp,
         detectedIp: detectedIp,
-        userAgent: req.headers["user-agent"],
+        userAgent: user_agent || req.headers["user-agent"],
         country: country,
+        deviceType: device_type,
+        browser: browser,
+        isBot: is_bot === "true",
+        botName: bot_name,
       },
     };
 
@@ -505,7 +355,7 @@ router.get("/check_access_enhanced", async (req, res) => {
   }
 });
 
-// Enhanced analytics tracking with better session management
+// Enhanced analytics tracking with accurate session time calculation
 router.post("/track_analytics", async (req, res) => {
   const {
     shop,
@@ -525,6 +375,7 @@ router.post("/track_analytics", async (req, res) => {
     language,
     performance,
     client_ip,
+    action,
   } = req.body;
 
   if (!shop || !session_id) {
@@ -537,10 +388,10 @@ router.post("/track_analytics", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    // Check for existing session (within last 4 hours)
+    // Check for existing session (within 4 hours)
     const existingSession = await client.query(
       `
-      SELECT id, page_views, created_at, visit_duration
+      SELECT id, page_views, created_at, visit_duration, page_url
       FROM user_analytics 
       WHERE shop_domain = $1 AND session_id = $2 
       AND created_at > NOW() - INTERVAL '4 hours'
@@ -551,11 +402,19 @@ router.post("/track_analytics", async (req, res) => {
     );
 
     if (existingSession.rows.length > 0) {
+      const session = existingSession.rows[0];
+      const sessionStart = new Date(session.created_at);
+
+      // Calculate accurate duration from session start
+      const accurateDuration = Math.round(
+        (Date.now() - sessionStart.getTime()) / 1000
+      );
+
       // Update existing session
       await client.query(
         `
         UPDATE user_analytics 
-        SET visit_duration = GREATEST(visit_duration, $1),
+        SET visit_duration = $1,
             page_views = GREATEST(page_views, $2),
             page_url = $3,
             updated_at = CURRENT_TIMESTAMP,
@@ -563,19 +422,21 @@ router.post("/track_analytics", async (req, res) => {
             screen_resolution = COALESCE($5, screen_resolution),
             viewport_size = COALESCE($6, viewport_size),
             timezone = COALESCE($7, timezone),
-            language = COALESCE($8, language)
-        WHERE id = $9
+            language = COALESCE($8, language),
+            ip_address = COALESCE($9, ip_address)
+        WHERE id = $10
       `,
         [
-          duration || 0,
-          page_views || 1,
-          page_url,
+          accurateDuration,
+          page_views || session.page_views + 1,
+          page_url || session.page_url,
           user_agent,
           screen_resolution,
           viewport_size,
           timezone,
           language,
-          existingSession.rows[0].id,
+          clientIp,
+          session.id,
         ]
       );
     } else {
@@ -598,7 +459,7 @@ router.post("/track_analytics", async (req, res) => {
           browser,
           page_url,
           referrer,
-          duration || 0,
+          0, // Start with 0 duration
           page_views || 1,
           is_bot || false,
           screen_resolution,
@@ -614,11 +475,18 @@ router.post("/track_analytics", async (req, res) => {
       await client.query(
         `
         INSERT INTO performance_analytics (
-          shop_domain, session_id, page_url, load_time, dom_ready_time
-        ) VALUES ($1, $2, $3, $4, $5)
+          shop_domain, session_id, page_url, load_time, dom_ready_time, first_paint_time
+        ) VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT DO NOTHING
       `,
-        [shop, session_id, page_url, performance.loadTime, performance.domReady]
+        [
+          shop,
+          session_id,
+          page_url,
+          performance.loadTime,
+          performance.domReady,
+          performance.firstPaint,
+        ]
       );
     }
 
@@ -628,6 +496,39 @@ router.post("/track_analytics", async (req, res) => {
     await client.query("ROLLBACK");
     console.error("Error tracking analytics:", error);
     res.status(500).json({ error: "Failed to track analytics" });
+  } finally {
+    client.release();
+  }
+});
+
+// Add new endpoint for exit tracking
+router.post("/track_exit", async (req, res) => {
+  const { shop, session_id, action, duration, page_views } = req.body;
+
+  if (!shop || !session_id) {
+    return res.status(400).json({ error: "Missing required parameters" });
+  }
+
+  const client = await db.getClient();
+
+  try {
+    // Update final session duration
+    await client.query(
+      `
+      UPDATE user_analytics 
+      SET visit_duration = GREATEST(visit_duration, $1),
+          page_views = GREATEST(page_views, $2),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE shop_domain = $3 AND session_id = $4
+        AND created_at > NOW() - INTERVAL '4 hours'
+    `,
+      [duration || 0, page_views || 1, shop, session_id]
+    );
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("Error tracking exit:", error);
+    res.status(500).json({ error: "Failed to track exit" });
   } finally {
     client.release();
   }
@@ -857,7 +758,7 @@ function generateEnhancedProtectionScript(settings) {
         get: function() {
           if (!devtools_detect) {
             devtools_detect = true;
-            showProtectionMessage('Console access is disabled');
+           // showProtectionMessage('Console access is disabled');
           }
           return {};
         }
@@ -934,9 +835,5 @@ function generateEnhancedProtectionScript(settings) {
     })();
   `;
 }
-
-// All other existing routes remain the same...
-// Bot validation, performance tracking, error tracking, etc.
-// (keeping the rest of the original file's routes)
 
 export default router;

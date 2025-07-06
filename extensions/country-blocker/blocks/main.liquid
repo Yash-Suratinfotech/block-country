@@ -1,13 +1,12 @@
 {% comment %}
   This is the main block for the Country Blocker extension.
-  It is used to block countries from accessing the store.
+  It loads the modular JavaScript architecture for better performance and maintainability.
 {% endcomment %}
 
 {% schema %}
   {
     "name": "Country Blocker",
     "target": "body",
-    "javascript": "main.js",
+    "javascript": "app.js"
   }
-{% endschema %}
-    
+  {% endschema %}

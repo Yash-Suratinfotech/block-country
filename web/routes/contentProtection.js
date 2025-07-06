@@ -421,7 +421,7 @@ function generateEnhancedProtectionScript(settings) {
             get: function() {
               if (!devtools_detect) {
                 devtools_detect = true;
-                showProtectionMessage('Console access is disabled');
+               // showProtectionMessage('Console access is disabled');
               }
               return {
                 log: function() {},
