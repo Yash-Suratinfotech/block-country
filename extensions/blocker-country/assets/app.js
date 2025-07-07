@@ -572,7 +572,7 @@
       };
 
       // Use fetch instead of sendBeacon
-      fetch("/apps/proxy-1/track_exit", {
+      fetch("/apps/proxy/track_exit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -670,7 +670,7 @@
 
         // Make API call
         const apiUrl = new URL(
-          "/apps/proxy-1/check_access_enhanced",
+          "/apps/proxy/check_access_enhanced",
           window.location.origin
         );
         Object.entries(checkData).forEach(([key, value]) => {
@@ -820,7 +820,7 @@
       }
 
       try {
-        const response = await fetch("/apps/proxy-1/track_analytics", {
+        const response = await fetch("/apps/proxy/track_analytics", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -857,7 +857,7 @@
 
     async trackError(error) {
       try {
-        await fetch("/apps/proxy-1/track_error", {
+        await fetch("/apps/proxy/track_error", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -944,7 +944,7 @@
   async function loadContentProtection(shop, settings) {
     try {
       console.log('✌️Loading content protection module via fetch');
-      const response = await fetch(`/apps/proxy-1/content_protection_script?shop=${shop}`);
+      const response = await fetch(`/apps/proxy/content_protection_script?shop=${shop}`);
       if (!response.ok) {
         throw new Error('Failed to fetch content protection script');
       }
