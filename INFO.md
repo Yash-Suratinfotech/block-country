@@ -8,7 +8,6 @@ I've successfully enhanced your existing country and IP blocker functionality to
 ### 🌍 Enhanced Country Management
 - **Whitelist Mode**: Only allow specific countries to access the store
 - **Blacklist Mode**: Block specific countries from accessing the store  
-- **Mixed Mode**: Combine both whitelist and blacklist rules (whitelist takes precedence)
 - **Redirect URLs**: Send blocked users to custom pages instead of showing block messages
 - **Global Settings**: Set default behavior and redirect URLs for the entire shop
 - **Bulk Import/Export**: Manage multiple countries at once
@@ -16,7 +15,6 @@ I've successfully enhanced your existing country and IP blocker functionality to
 ### 🔒 Enhanced IP Management
 - **Whitelist Mode**: Only allow specific IP addresses to access the store
 - **Blacklist Mode**: Block specific IP addresses from accessing the store
-- **Mixed Mode**: Combine both whitelist and blacklist rules (whitelist takes precedence)
 - **Redirect URLs**: Send blocked users to custom pages instead of showing block messages
 - **Enhanced Notes**: Better context for why IPs were blocked/allowed
 - **Global Settings**: Set default behavior and auto-blocking thresholds
@@ -40,96 +38,6 @@ I've successfully enhanced your existing country and IP blocker functionality to
 - **Enhanced Validation**: Real-time IP address format validation
 - **Export Capability**: Download rules as CSV with full details
 
-## 🔧 API Enhancements
-
-### New Endpoints Added
-
-#### Country Management
-```javascript
-// Enhanced existing endpoints
-GET /api/blocked-countries?list_type=whitelist  // Filter by rule type
-POST /api/blocked-countries                     // Now supports list_type and redirect_url
-PUT /api/blocked-countries/:code               // Update existing rules
-GET /api/blocked-countries/export             // Export to CSV
-
-// New endpoints
-GET /api/country-settings                      // Get global country settings
-POST /api/country-settings                     // Update global country settings
-POST /api/blocked-countries/bulk-import        // Import multiple countries
-```
-
-#### IP Management
-```javascript
-// Enhanced existing endpoints
-GET /api/blocked-ips?list_type=blacklist       // Filter by rule type
-POST /api/blocked-ips                          // Now supports list_type and redirect_url
-PUT /api/blocked-ips/:ip                       // Update existing rules
-GET /api/blocked-ips/export                    // Export to CSV
-
-// New endpoints
-GET /api/ip-settings                           // Get global IP settings
-POST /api/ip-settings                          // Update global IP settings
-POST /api/blocked-ips/bulk-import              // Import multiple IPs
-GET /api/blocked-ips/analytics                 // IP-specific analytics
-```
-
-#### Enhanced Public Endpoints
-```javascript
-GET /data/info/check_access_enhanced           // Multi-layer checking with redirects
-GET /data/info/validate_bot                    // Bot validation with redirects
-POST /data/info/track_analytics                // Enhanced analytics tracking
-POST /data/info/track_performance              // Performance monitoring
-GET /data/info/blocking_rules_summary          // Get blocking rules overview
-```
-
-## 🗄️ Database Schema Updates
-
-### New Tables
-```sql
--- Global settings for countries
-CREATE TABLE country_settings (
-  shop_domain TEXT UNIQUE,
-  default_list_type VARCHAR(10) DEFAULT 'blacklist',
-  redirect_url TEXT,
-  custom_message TEXT,
-  enable_country_detection BOOLEAN DEFAULT true
-);
-
--- Global settings for IPs
-CREATE TABLE ip_settings (
-  shop_domain TEXT UNIQUE,
-  default_list_type VARCHAR(10) DEFAULT 'blacklist',
-  redirect_url TEXT,
-  custom_message TEXT,
-  auto_block_repeated_attempts BOOLEAN DEFAULT false,
-  max_attempts_threshold INTEGER DEFAULT 5,
-  enable_ip_detection BOOLEAN DEFAULT true
-);
-```
-
-### Enhanced Existing Tables
-```sql
--- Added to blocked_countries
-ALTER TABLE blocked_countries 
-ADD COLUMN list_type VARCHAR(10) DEFAULT 'blacklist',
-ADD COLUMN redirect_url TEXT,
-ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
-
--- Added to blocked_ips
-ALTER TABLE blocked_ips 
-ADD COLUMN list_type VARCHAR(10) DEFAULT 'blacklist',
-ADD COLUMN redirect_url TEXT,
-ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
-```
-
-### New Views for Analytics
-```sql
--- Comprehensive blocking rules summary
-CREATE VIEW blocking_rules_summary AS
-SELECT shop_domain, rule_type, total_rules, whitelist_count, blacklist_count
-FROM country_and_ip_rules;
-```
-
 ## 🌐 Enhanced Storefront Integration
 
 ### Redirect Support
@@ -142,42 +50,6 @@ FROM country_and_ip_rules;
 1. **Country Check**: Uses browser timezone and locale for detection
 2. **IP Check**: Supports both IPv4 and IPv6 with proper normalization
 3. **Whitelist Priority**: Whitelist rules always take precedence over blacklist
-4. **Mixed Mode Support**: Can have both types of rules active simultaneously
-
-## 📊 How Whitelist/Blacklist Logic Works
-
-### Country Rules Logic
-```javascript
-if (hasCountryWhitelist) {
-  // Whitelist mode: Only allow listed countries
-  allow = isCountryInWhitelist(country);
-} else if (hasCountryBlacklist) {
-  // Blacklist mode: Block listed countries  
-  allow = !isCountryInBlacklist(country);
-} else {
-  // No rules: Allow all countries
-  allow = true;
-}
-```
-
-### IP Rules Logic
-```javascript
-if (hasIPWhitelist) {
-  // Whitelist mode: Only allow listed IPs
-  allow = isIPInWhitelist(ip);
-} else if (hasIPBlacklist) {
-  // Blacklist mode: Block listed IPs
-  allow = !isIPInBlacklist(ip);
-} else {
-  // No rules: Allow all IPs
-  allow = true;
-}
-```
-
-### Mixed Mode Behavior
-- **Whitelist takes precedence**: If an item is whitelisted, it's always allowed
-- **Blacklist is secondary**: Only applied if no whitelist rules exist
-- **Clear indicators**: UI shows which mode is active with status banners
 
 ## 🚀 Implementation Steps
 
@@ -187,74 +59,6 @@ if (hasIPWhitelist) {
 cd web
 npm run db
 # This will add new tables and columns without affecting existing data
-```
-
-### 2. Update Backend Files
-```javascript
-// Replace these files with enhanced versions:
-web/routes/blockedCountries.js    // Enhanced API with whitelist/blacklist
-web/routes/blockedIps.js          // Enhanced API with whitelist/blacklist  
-web/routes/publicCheck.js         // Enhanced with redirect support
-```
-
-### 3. Update Frontend Files
-```javascript
-// Replace these files with enhanced versions:
-web/frontend/pages/country-blocker.jsx  // Enhanced UI with tabs and settings
-web/frontend/pages/ip-blocker.jsx       // Enhanced UI with tabs and settings
-```
-
-### 4. Update Storefront Script
-```javascript
-// Replace the storefront script:
-extensions/country-blocker/assets/enhanced-main.js  // Enhanced with redirects
-```
-
-## 🎯 Usage Examples
-
-### Example 1: Pure Whitelist Mode
-```javascript
-// Only allow US, CA, GB
-POST /api/blocked-countries
-{
-  "shop": "myshop.myshopify.com",
-  "country": "US", 
-  "list_type": "whitelist"
-}
-// Result: Only US, CA, GB can access. All others are blocked.
-```
-
-### Example 2: Pure Blacklist Mode  
-```javascript
-// Block specific countries
-POST /api/blocked-countries
-{
-  "shop": "myshop.myshopify.com",
-  "country": "XX",
-  "list_type": "blacklist"
-}
-// Result: Only XX is blocked. All others are allowed.
-```
-
-### Example 3: Mixed Mode with Redirects
-```javascript
-// Whitelist priority: US is always allowed
-POST /api/blocked-countries
-{
-  "shop": "myshop.myshopify.com",
-  "country": "US",
-  "list_type": "whitelist"
-}
-
-// Blacklist with redirect: FR gets redirected  
-POST /api/blocked-countries
-{
-  "shop": "myshop.myshopify.com",
-  "country": "FR",
-  "list_type": "blacklist", 
-  "redirect_url": "https://example.com/fr-store"
-}
-// Result: US always allowed, FR redirected, others blocked (whitelist mode active)
 ```
 
 ## 🔍 Testing Your Implementation
@@ -273,11 +77,6 @@ POST /api/blocked-countries
 1. Add redirect URL to a blocked country/IP
 2. Access from that location
 3. Should show loading message then redirect
-
-### Test Mixed Mode
-1. Add some countries to whitelist
-2. Add others to blacklist  
-3. Whitelist should take precedence
 
 ## ⚡ Performance Impact
 

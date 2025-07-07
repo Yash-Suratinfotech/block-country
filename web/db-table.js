@@ -22,14 +22,14 @@ try {
   // Create table
   await client.query(`
     -- DROP TABLES FIRST IF NEEDED (optional, for reset)
-    -- DROP TABLE IF EXISTS performance_analytics CASCADE;
-    -- DROP TABLE IF EXISTS user_analytics CASCADE;
+    -- DROP TABLE IF EXISTS blocked_countries CASCADE;
+    -- DROP TABLE IF EXISTS blocked_ips CASCADE;
+    -- DROP TABLE IF EXISTS bot_settings CASCADE;
     -- DROP TABLE IF EXISTS content_protection_settings CASCADE;
+    -- DROP TABLE IF EXISTS user_analytics CASCADE;
+    -- DROP TABLE IF EXISTS performance_analytics CASCADE;
     -- DROP TABLE IF EXISTS country_settings CASCADE;
     -- DROP TABLE IF EXISTS ip_settings CASCADE;
-    -- DROP TABLE IF EXISTS bot_settings CASCADE;
-    -- DROP TABLE IF EXISTS blocked_ips CASCADE;
-    -- DROP TABLE IF EXISTS blocked_countries CASCADE;
     -- DROP TABLE IF EXISTS shops CASCADE;
 
     -- 1. shops table

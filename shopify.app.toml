@@ -1,17 +1,17 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "bcbf9dfb209d9ceb441b2a8acb6a7a52"
+client_id = "7336a0b90ddf9a11935b69c5bd69a4c0"
 name = "Block Country"
-handle = "block-country-2"
+handle = "block-country-1"
 application_url = "https://block-country.onrender.com"
 embedded = true
 
 [build]
 automatically_update_urls_on_dev = true
-include_config_on_deploy = true
+include_config_on_deploy = true 
 
 [webhooks]
-api_version = "2025-07"
+api_version = "2025-04"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
@@ -22,8 +22,8 @@ redirect_urls = ["https://block-country.onrender.com/api/auth/callback", "https:
 
 [app_proxy]
 url = "https://block-country.onrender.com/data/info"
-subpath = "proxy-1"
+subpath = "proxy"
 prefix = "apps"
 
-[pos]
+[pos]   
 embedded = false
