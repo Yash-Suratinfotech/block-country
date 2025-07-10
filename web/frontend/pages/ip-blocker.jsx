@@ -24,11 +24,10 @@ import {
   Modal,
   Tabs,
 } from "@shopify/polaris";
-import { 
-  DeleteIcon, 
-  LockIcon, 
+import {
+  DeleteIcon,
+  LockIcon,
   EditIcon,
-  ExportIcon,
   PlusIcon,
   SettingsIcon,
 } from "@shopify/polaris-icons";
@@ -37,45 +36,56 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 export default function EnhancedIPBlocker() {
   const shopify = useAppBridge();
   const shop = shopify.config.shop;
-  
+
   const [blockedIPs, setBlockedIPs] = useState([]);
   const [ipAddress, setIpAddress] = useState("");
   const [ipNote, setIpNote] = useState("");
-  const [listType, setListType] = useState("blacklist");
+  const [listType, setListType] = useState("all");
   const [redirectUrl, setRedirectUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [ipError, setIpError] = useState("");
   const [selectedTab, setSelectedTab] = useState(0);
-  
+
   // Modal states
   const [modalActive, setModalActive] = useState(false);
   const [editingIP, setEditingIP] = useState(null);
   const [settingsModalActive, setSettingsModalActive] = useState(false);
-  
+
   // Global settings
   const [globalSettings, setGlobalSettings] = useState({
-    default_list_type: "blacklist",
+    default_list_type: "all",
     redirect_url: "",
-    custom_message: "Your IP address has been blocked from accessing this store.",
+    custom_message:
+      "Your IP address has been blocked from accessing this store.",
     auto_block_repeated_attempts: false,
-    max_attempts_threshold: 5
+    max_attempts_threshold: 5,
   });
-  
+
   // Toast state
   const [toastActive, setToastActive] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
   const tabs = [
-    { id: "blacklist", content: "Blacklist", accessibilityLabel: "Blacklisted IPs" },
-    { id: "whitelist", content: "Whitelist", accessibilityLabel: "Whitelisted IPs" },
     { id: "all", content: "All Rules", accessibilityLabel: "All IP Rules" },
+    {
+      id: "blacklist",
+      content: "Blacklist",
+      accessibilityLabel: "Blacklisted IPs",
+    },
+    {
+      id: "whitelist",
+      content: "Whitelist",
+      accessibilityLabel: "Whitelisted IPs",
+    },
   ];
 
   // Filter IPs based on selected tab
   const filteredIPs = React.useMemo(() => {
-    if (selectedTab === 0) return blockedIPs.filter(ip => ip.list_type === 'blacklist');
-    if (selectedTab === 1) return blockedIPs.filter(ip => ip.list_type === 'whitelist');
+    if (selectedTab === 1)
+      return blockedIPs.filter((ip) => ip.list_type === "blacklist");
+    if (selectedTab === 2)
+      return blockedIPs.filter((ip) => ip.list_type === "whitelist");
     return blockedIPs;
   }, [blockedIPs, selectedTab]);
 
@@ -87,7 +97,7 @@ export default function EnhancedIPBlocker() {
     try {
       const [ipsRes, settingsRes] = await Promise.all([
         fetch("/api/blocked-ips?shop=" + shop),
-        fetch("/api/ip-settings?shop=" + shop)
+        fetch("/api/ip-settings?shop=" + shop),
       ]);
 
       if (ipsRes.ok) {
@@ -124,7 +134,9 @@ export default function EnhancedIPBlocker() {
 
     if (ipv4Regex.test(ip)) {
       const parts = ip.split(".");
-      return parts.every(part => parseInt(part) >= 0 && parseInt(part) <= 255);
+      return parts.every(
+        (part) => parseInt(part) >= 0 && parseInt(part) <= 255
+      );
     }
 
     return ipv6Regex.test(ip) || ip === "::1";
@@ -186,7 +198,7 @@ export default function EnhancedIPBlocker() {
     setSaving(true);
     try {
       const method = editingIP ? "PUT" : "POST";
-      const url = editingIP 
+      const url = editingIP
         ? `/api/blocked-ips/${editingIP.ip_address}`
         : "/api/blocked-ips";
 
@@ -205,7 +217,7 @@ export default function EnhancedIPBlocker() {
       if (response.ok) {
         await loadData();
         closeModal();
-        showToast(`IP address ${editingIP ? 'updated' : 'added'} successfully`);
+        showToast(`IP address ${editingIP ? "updated" : "added"} successfully`);
       } else {
         const errorData = await response.json();
         showToast(errorData.error || "Error saving IP address");
@@ -243,33 +255,15 @@ export default function EnhancedIPBlocker() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           shop: shop,
-          ...globalSettings
+          ...globalSettings,
         }),
       });
-      
+
       setSettingsModalActive(false);
       showToast("IP settings saved");
     } catch (error) {
       console.error("Error saving settings:", error);
       showToast("Error saving settings");
-    }
-  };
-
-  const exportIPs = async () => {
-    try {
-      const response = await fetch(`/api/blocked-ips/export?shop=${shop}`);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `ip-rules-${shop}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error("Error exporting IPs:", error);
-      showToast("Error exporting data");
     }
   };
 
@@ -284,8 +278,12 @@ export default function EnhancedIPBlocker() {
   };
 
   const getListTypeStats = () => {
-    const blacklistCount = blockedIPs.filter(ip => ip.list_type === 'blacklist').length;
-    const whitelistCount = blockedIPs.filter(ip => ip.list_type === 'whitelist').length;
+    const blacklistCount = blockedIPs.filter(
+      (ip) => ip.list_type === "blacklist"
+    ).length;
+    const whitelistCount = blockedIPs.filter(
+      (ip) => ip.list_type === "whitelist"
+    ).length;
     return { blacklistCount, whitelistCount };
   };
 
@@ -332,7 +330,11 @@ export default function EnhancedIPBlocker() {
             autoComplete="off"
             monospaced
             disabled={editingIP !== null}
-            helpText={editingIP ? "IP address cannot be changed. Delete and re-add to change IP." : "Supports both IPv4 and IPv6 addresses"}
+            helpText={
+              editingIP
+                ? "IP address cannot be changed. Delete and re-add to change IP."
+                : "Supports both IPv4 and IPv6 addresses"
+            }
           />
 
           <Select
@@ -389,7 +391,12 @@ export default function EnhancedIPBlocker() {
           <Select
             label="Default Rule Type"
             value={globalSettings.default_list_type}
-            onChange={(value) => setGlobalSettings(prev => ({ ...prev, default_list_type: value }))}
+            onChange={(value) =>
+              setGlobalSettings((prev) => ({
+                ...prev,
+                default_list_type: value,
+              }))
+            }
             options={[
               { label: "Blacklist (Block access)", value: "blacklist" },
               { label: "Whitelist (Allow access only)", value: "whitelist" },
@@ -400,7 +407,9 @@ export default function EnhancedIPBlocker() {
           <TextField
             label="Default Redirect URL"
             value={globalSettings.redirect_url}
-            onChange={(value) => setGlobalSettings(prev => ({ ...prev, redirect_url: value }))}
+            onChange={(value) =>
+              setGlobalSettings((prev) => ({ ...prev, redirect_url: value }))
+            }
             placeholder="https://example.com/blocked"
             helpText="Default redirect URL for blocked IPs"
             autoComplete="off"
@@ -409,7 +418,9 @@ export default function EnhancedIPBlocker() {
           <TextField
             label="Custom Block Message"
             value={globalSettings.custom_message}
-            onChange={(value) => setGlobalSettings(prev => ({ ...prev, custom_message: value }))}
+            onChange={(value) =>
+              setGlobalSettings((prev) => ({ ...prev, custom_message: value }))
+            }
             multiline={3}
             helpText="Message shown when access is blocked (if no redirect URL)"
           />
@@ -438,29 +449,23 @@ export default function EnhancedIPBlocker() {
             onAction: () => setSettingsModalActive(true),
             icon: SettingsIcon,
           },
-          {
-            content: "Export",
-            onAction: exportIPs,
-            icon: ExportIcon,
-          },
         ]}
       >
         <Layout>
           {/* Status Banner */}
           <Layout.Section>
-            <Banner 
-              title={`IP Rules Active: ${blacklistCount} Blocked, ${whitelistCount} Allowed`} 
+            <Banner
+              title={`IP Rules Active: ${blacklistCount} Blocked, ${whitelistCount} Allowed`}
               tone={blockedIPs.length > 0 ? "info" : "warning"}
             >
               <p>
-                {whitelistCount > 0 && blacklistCount > 0 
+                {whitelistCount > 0 && blacklistCount > 0
                   ? "Mixed mode: Whitelist takes precedence over blacklist rules"
-                  : whitelistCount > 0 
+                  : whitelistCount > 0
                   ? "Whitelist mode: Only listed IP addresses can access your store"
                   : blacklistCount > 0
                   ? "Blacklist mode: Listed IP addresses are blocked from accessing your store"
-                  : "No IP rules configured"
-                }
+                  : "No IP rules configured"}
               </p>
             </Banner>
           </Layout.Section>
@@ -469,7 +474,12 @@ export default function EnhancedIPBlocker() {
           <Layout.Section>
             <Card>
               <BlockStack>
-                <Box paddingBlockStart="400" paddingBlockEnd="400" paddingInlineStart="500" paddingInlineEnd="500">
+                <Box
+                  paddingBlockStart="400"
+                  paddingBlockEnd="400"
+                  paddingInlineStart="500"
+                  paddingInlineEnd="500"
+                >
                   <BlockStack gap="200">
                     <Text as="h2" variant="headingMd">
                       IP Address Rules
@@ -482,12 +492,23 @@ export default function EnhancedIPBlocker() {
                   </BlockStack>
                 </Box>
 
-                <Tabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange} />
+                <Tabs
+                  tabs={tabs}
+                  selected={selectedTab}
+                  onSelect={handleTabChange}
+                />
 
-                <Box paddingBlockStart="400" paddingBlockEnd="400" paddingInlineStart="500" paddingInlineEnd="500">
+                <Box
+                  paddingBlockStart="400"
+                  paddingBlockEnd="400"
+                  paddingInlineStart="500"
+                  paddingInlineEnd="500"
+                >
                   {filteredIPs.length === 0 ? (
                     <EmptyState
-                      heading={`No ${tabs[selectedTab].content.toLowerCase()} IP addresses`}
+                      heading={`No ${tabs[
+                        selectedTab
+                      ].content.toLowerCase()} IP addresses`}
                       image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
                       action={{
                         content: "Add IP Rule",
@@ -495,7 +516,8 @@ export default function EnhancedIPBlocker() {
                       }}
                     >
                       <p>
-                        Start by adding IP addresses to your {tabs[selectedTab].content.toLowerCase()}.
+                        Start by adding IP addresses to your{" "}
+                        {tabs[selectedTab].content.toLowerCase()}.
                       </p>
                     </EmptyState>
                   ) : (
@@ -503,14 +525,20 @@ export default function EnhancedIPBlocker() {
                       {filteredIPs.map((item, index) => (
                         <React.Fragment key={item.ip_address}>
                           <Box>
-                            <InlineStack align="space-between" blockAlign="start">
+                            <InlineStack
+                              align="space-between"
+                              blockAlign="start"
+                            >
                               <InlineStack gap="400" blockAlign="start">
                                 <div
                                   style={{
                                     width: "40px",
                                     height: "40px",
                                     borderRadius: "8px",
-                                    backgroundColor: item.list_type === 'whitelist' ? "#d4edda" : "#f8d7da",
+                                    backgroundColor:
+                                      item.list_type === "whitelist"
+                                        ? "#d4edda"
+                                        : "#f8d7da",
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
@@ -520,24 +548,46 @@ export default function EnhancedIPBlocker() {
                                 </div>
                                 <BlockStack gap="100">
                                   <InlineStack gap="200" blockAlign="center">
-                                    <Text as="span" variant="bodyMd" fontWeight="semibold">
+                                    <Text
+                                      as="span"
+                                      variant="bodyMd"
+                                      fontWeight="semibold"
+                                    >
                                       {item.ip_address}
                                     </Text>
-                                    <Badge tone={item.list_type === 'whitelist' ? 'success' : 'critical'}>
+                                    <Badge
+                                      tone={
+                                        item.list_type === "whitelist"
+                                          ? "success"
+                                          : "critical"
+                                      }
+                                    >
                                       {item.list_type}
                                     </Badge>
                                   </InlineStack>
                                   {item.note && (
-                                    <Text as="span" variant="bodySm" tone="subdued">
+                                    <Text
+                                      as="span"
+                                      variant="bodySm"
+                                      tone="subdued"
+                                    >
                                       Note: {item.note}
                                     </Text>
                                   )}
                                   {item.redirect_url && (
-                                    <Text as="span" variant="bodySm" tone="subdued">
+                                    <Text
+                                      as="span"
+                                      variant="bodySm"
+                                      tone="subdued"
+                                    >
                                       Redirects to: {item.redirect_url}
                                     </Text>
                                   )}
-                                  <Text as="span" variant="bodySm" tone="subdued">
+                                  <Text
+                                    as="span"
+                                    variant="bodySm"
+                                    tone="subdued"
+                                  >
                                     Added on {formatDate(item.created_at)}
                                   </Text>
                                 </BlockStack>
@@ -555,7 +605,9 @@ export default function EnhancedIPBlocker() {
                                 <Button
                                   variant="tertiary"
                                   tone="critical"
-                                  onClick={() => removeIPAddress(item.ip_address)}
+                                  onClick={() =>
+                                    removeIPAddress(item.ip_address)
+                                  }
                                   icon={DeleteIcon}
                                   accessibilityLabel="Remove IP rule"
                                 >
@@ -577,30 +629,39 @@ export default function EnhancedIPBlocker() {
           {/* Information Card */}
           <Layout.Section secondary>
             <Card>
-              <Box background="bg-surface-secondary" padding="400">
-                <BlockStack gap="200">
+              <BlockStack gap="200">
+                <InlineStack align="start" blockAlign="center" gap="200">
+                  <InlineStack>
+                    <Icon source={LockIcon} tone="base" />
+                  </InlineStack>
                   <Text as="h3" variant="headingSm">
                     How IP address rules work
                   </Text>
-                  <BlockStack gap="200">
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                      <strong>Blacklist:</strong> Blocks access from specified IP addresses
-                    </Text>
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                      <strong>Whitelist:</strong> Allows access only from specified IP addresses and take precedence over blacklist country rules
-                    </Text>
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                      <strong>IPv4 & IPv6:</strong> Both IP address formats are supported
-                    </Text>
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                      <strong>Redirects:</strong> Send blocked users to a custom URL instead of showing a block message
-                    </Text>
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                      <strong>Notes:</strong> Add context to remember why specific IPs were blocked or allowed
-                    </Text>
-                  </BlockStack>
+                </InlineStack>
+                <BlockStack gap="200">
+                  <Text as="p" variant="bodyMd" tone="subdued">
+                    • <strong>Blacklist:</strong> Blocks access from specified
+                    IP addresses
+                  </Text>
+                  <Text as="p" variant="bodyMd" tone="subdued">
+                    • <strong>Whitelist:</strong> Allows access only from
+                    specified IP addresses and take precedence over blacklist
+                    country rules
+                  </Text>
+                  <Text as="p" variant="bodyMd" tone="subdued">
+                    • <strong>IPv4 & IPv6:</strong> Both IP address formats are
+                    supported
+                  </Text>
+                  <Text as="p" variant="bodyMd" tone="subdued">
+                    • <strong>Redirects:</strong> Send blocked users to a custom
+                    URL instead of showing a block message
+                  </Text>
+                  <Text as="p" variant="bodyMd" tone="subdued">
+                    • <strong>Notes:</strong> Add context to remember why
+                    specific IPs were blocked or allowed
+                  </Text>
                 </BlockStack>
-              </Box>
+              </BlockStack>
             </Card>
           </Layout.Section>
         </Layout>

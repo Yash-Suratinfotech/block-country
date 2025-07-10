@@ -31,9 +31,9 @@ import {
   DeleteIcon,
   LocationFilledIcon,
   EditIcon,
-  ExportIcon,
   PlusIcon,
   SettingsIcon,
+  LockIcon,
 } from "@shopify/polaris-icons";
 import { countryOptions } from "../utils/countryOptions";
 import { useAppBridge } from "@shopify/app-bridge-react";
@@ -41,49 +41,64 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 export default function EnhancedCountryBlocker() {
   const shopify = useAppBridge();
   const shop = shopify.config.shop;
-  
+
   const [blockedCountries, setBlockedCountries] = useState([]);
   const [selectedOptions, setSelectedOptions] = useState([]);
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedTab, setSelectedTab] = useState(0);
-  
+
   // Modal states
   const [modalActive, setModalActive] = useState(false);
   const [editingCountry, setEditingCountry] = useState(null);
   const [settingsModalActive, setSettingsModalActive] = useState(false);
-  
+
   // Form states
-  const [listType, setListType] = useState("blacklist");
+  const [listType, setListType] = useState("all");
   const [redirectUrl, setRedirectUrl] = useState("");
   const [globalSettings, setGlobalSettings] = useState({
-    default_list_type: "blacklist",
+    default_list_type: "all",
     redirect_url: "",
-    custom_message: "Sorry, this store is not available in your country."
+    custom_message: "Sorry, this store is not available in your country.",
   });
-  
+
   // Toast state
   const [toastActive, setToastActive] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
   const tabs = [
-    { id: "blacklist", content: "Blacklist", accessibilityLabel: "Blacklisted Countries" },
-    { id: "whitelist", content: "Whitelist", accessibilityLabel: "Whitelisted Countries" },
-    { id: "all", content: "All Rules", accessibilityLabel: "All Country Rules" },
+    {
+      id: "all",
+      content: "All Rules",
+      accessibilityLabel: "All Country Rules",
+    },
+    {
+      id: "blacklist",
+      content: "Blacklist",
+      accessibilityLabel: "Blacklisted Countries",
+    },
+    {
+      id: "whitelist",
+      content: "Whitelist",
+      accessibilityLabel: "Whitelisted Countries",
+    },
   ];
 
   // Filter countries based on selected tab
   const filteredCountries = useMemo(() => {
-    if (selectedTab === 0) return blockedCountries.filter(c => c.list_type === 'blacklist');
-    if (selectedTab === 1) return blockedCountries.filter(c => c.list_type === 'whitelist');
+    if (selectedTab === 1)
+      return blockedCountries.filter((c) => c.list_type === "blacklist");
+    if (selectedTab === 2)
+      return blockedCountries.filter((c) => c.list_type === "whitelist");
     return blockedCountries;
   }, [blockedCountries, selectedTab]);
 
   // Get available countries for selection (excluding already added ones)
   const deselectedOptions = useMemo(() => {
     const options = countryOptions.filter((option) => {
-      if (blockedCountries.some((c) => c.country_code === option.value)) return false;
+      if (blockedCountries.some((c) => c.country_code === option.value))
+        return false;
       if (inputValue === "") return true;
       return (
         option.label.toLowerCase().includes(inputValue.toLowerCase()) ||
@@ -101,7 +116,7 @@ export default function EnhancedCountryBlocker() {
     try {
       const [countriesRes, settingsRes] = await Promise.all([
         fetch("/api/blocked-countries?shop=" + shop),
-        fetch("/api/country-settings?shop=" + shop)
+        fetch("/api/country-settings?shop=" + shop),
       ]);
 
       if (countriesRes.ok) {
@@ -171,7 +186,7 @@ export default function EnhancedCountryBlocker() {
             shop: shop,
             country,
             list_type: listType,
-            redirect_url: redirectUrl.trim() || null
+            redirect_url: redirectUrl.trim() || null,
           }),
         })
       );
@@ -179,7 +194,11 @@ export default function EnhancedCountryBlocker() {
       await Promise.all(promises);
       await loadData();
       closeModal();
-      showToast(`${selectedOptions.length} ${selectedOptions.length === 1 ? 'country' : 'countries'} added to ${listType}`);
+      showToast(
+        `${selectedOptions.length} ${
+          selectedOptions.length === 1 ? "country" : "countries"
+        } added to ${listType}`
+      );
     } catch (error) {
       console.error("Error adding countries:", error);
       showToast("Error adding countries");
@@ -199,7 +218,7 @@ export default function EnhancedCountryBlocker() {
         body: JSON.stringify({
           shop: shop,
           list_type: listType,
-          redirect_url: redirectUrl.trim() || null
+          redirect_url: redirectUrl.trim() || null,
         }),
       });
 
@@ -221,7 +240,9 @@ export default function EnhancedCountryBlocker() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ shop: shop }),
       });
-      setBlockedCountries(blockedCountries.filter((c) => c.country_code !== code));
+      setBlockedCountries(
+        blockedCountries.filter((c) => c.country_code !== code)
+      );
       showToast("Country removed");
     } catch (error) {
       console.error("Error removing country:", error);
@@ -245,33 +266,15 @@ export default function EnhancedCountryBlocker() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           shop: shop,
-          ...globalSettings
+          ...globalSettings,
         }),
       });
-      
+
       setSettingsModalActive(false);
       showToast("Global settings saved");
     } catch (error) {
       console.error("Error saving settings:", error);
       showToast("Error saving settings");
-    }
-  };
-
-  const exportCountries = async () => {
-    try {
-      const response = await fetch(`/api/blocked-countries/export?shop=${shop}`);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `country-rules-${shop}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error("Error exporting countries:", error);
-      showToast("Error exporting data");
     }
   };
 
@@ -291,8 +294,12 @@ export default function EnhancedCountryBlocker() {
   };
 
   const getListTypeStats = () => {
-    const blacklistCount = blockedCountries.filter(c => c.list_type === 'blacklist').length;
-    const whitelistCount = blockedCountries.filter(c => c.list_type === 'whitelist').length;
+    const blacklistCount = blockedCountries.filter(
+      (c) => c.list_type === "blacklist"
+    ).length;
+    const whitelistCount = blockedCountries.filter(
+      (c) => c.list_type === "whitelist"
+    ).length;
     return { blacklistCount, whitelistCount };
   };
 
@@ -357,7 +364,7 @@ export default function EnhancedCountryBlocker() {
       <Modal.Section>
         <FormLayout>
           {!editingCountry && (
-            <>
+            <BlockStack gap="200">
               <Autocomplete
                 allowMultiple
                 options={optionList}
@@ -366,10 +373,8 @@ export default function EnhancedCountryBlocker() {
                 textField={textField}
               />
 
-              {tagsMarkup && (
-                <InlineStack gap="200">{tagsMarkup}</InlineStack>
-              )}
-            </>
+              {tagsMarkup && <InlineStack gap="200">{tagsMarkup}</InlineStack>}
+            </BlockStack>
           )}
 
           {editingCountry && (
@@ -426,7 +431,12 @@ export default function EnhancedCountryBlocker() {
           <Select
             label="Default Rule Type"
             value={globalSettings.default_list_type}
-            onChange={(value) => setGlobalSettings(prev => ({ ...prev, default_list_type: value }))}
+            onChange={(value) =>
+              setGlobalSettings((prev) => ({
+                ...prev,
+                default_list_type: value,
+              }))
+            }
             options={[
               { label: "Blacklist (Block access)", value: "blacklist" },
               { label: "Whitelist (Allow access only)", value: "whitelist" },
@@ -437,7 +447,9 @@ export default function EnhancedCountryBlocker() {
           <TextField
             label="Default Redirect URL"
             value={globalSettings.redirect_url}
-            onChange={(value) => setGlobalSettings(prev => ({ ...prev, redirect_url: value }))}
+            onChange={(value) =>
+              setGlobalSettings((prev) => ({ ...prev, redirect_url: value }))
+            }
             placeholder="https://example.com/blocked"
             helpText="Default redirect URL for blocked countries"
             autoComplete="off"
@@ -446,7 +458,9 @@ export default function EnhancedCountryBlocker() {
           <TextField
             label="Custom Block Message"
             value={globalSettings.custom_message}
-            onChange={(value) => setGlobalSettings(prev => ({ ...prev, custom_message: value }))}
+            onChange={(value) =>
+              setGlobalSettings((prev) => ({ ...prev, custom_message: value }))
+            }
             multiline={3}
             helpText="Message shown when access is blocked (if no redirect URL)"
           />
@@ -475,29 +489,23 @@ export default function EnhancedCountryBlocker() {
             onAction: () => setSettingsModalActive(true),
             icon: SettingsIcon,
           },
-          {
-            content: "Export",
-            onAction: exportCountries,
-            icon: ExportIcon,
-          },
         ]}
       >
         <Layout>
           {/* Status Banner */}
           <Layout.Section>
-            <Banner 
-              title={`Country Rules Active: ${blacklistCount} Blocked, ${whitelistCount} Allowed`} 
+            <Banner
+              title={`Country Rules Active: ${blacklistCount} Blocked, ${whitelistCount} Allowed`}
               tone={blockedCountries.length > 0 ? "info" : "warning"}
             >
               <p>
-                {whitelistCount > 0 && blacklistCount > 0 
+                {whitelistCount > 0 && blacklistCount > 0
                   ? "Mixed mode: Whitelist takes precedence over blacklist rules"
-                  : whitelistCount > 0 
+                  : whitelistCount > 0
                   ? "Whitelist mode: Only listed countries can access your store"
                   : blacklistCount > 0
                   ? "Blacklist mode: Listed countries are blocked from accessing your store"
-                  : "No country rules configured"
-                }
+                  : "No country rules configured"}
               </p>
             </Banner>
           </Layout.Section>
@@ -506,7 +514,12 @@ export default function EnhancedCountryBlocker() {
           <Layout.Section>
             <Card>
               <BlockStack>
-                <Box paddingBlockStart="400" paddingBlockEnd="400" paddingInlineStart="500" paddingInlineEnd="500">
+                <Box
+                  paddingBlockStart="400"
+                  paddingBlockEnd="400"
+                  paddingInlineStart="500"
+                  paddingInlineEnd="500"
+                >
                   <BlockStack gap="200">
                     <Text as="h2" variant="headingMd">
                       Country Rules
@@ -519,12 +532,23 @@ export default function EnhancedCountryBlocker() {
                   </BlockStack>
                 </Box>
 
-                <Tabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange} />
+                <Tabs
+                  tabs={tabs}
+                  selected={selectedTab}
+                  onSelect={handleTabChange}
+                />
 
-                <Box paddingBlockStart="400" paddingBlockEnd="400" paddingInlineStart="500" paddingInlineEnd="500">
+                <Box
+                  paddingBlockStart="400"
+                  paddingBlockEnd="400"
+                  paddingInlineStart="500"
+                  paddingInlineEnd="500"
+                >
                   {filteredCountries.length === 0 ? (
                     <EmptyState
-                      heading={`No ${tabs[selectedTab].content.toLowerCase()} countries`}
+                      heading={`No ${tabs[
+                        selectedTab
+                      ].content.toLowerCase()} countries`}
                       image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
                       action={{
                         content: "Add Country Rule",
@@ -532,7 +556,8 @@ export default function EnhancedCountryBlocker() {
                       }}
                     >
                       <p>
-                        Start by adding countries to your {tabs[selectedTab].content.toLowerCase()}.
+                        Start by adding countries to your{" "}
+                        {tabs[selectedTab].content.toLowerCase()}.
                       </p>
                     </EmptyState>
                   ) : (
@@ -540,39 +565,70 @@ export default function EnhancedCountryBlocker() {
                       {filteredCountries.map((item, index) => (
                         <React.Fragment key={item.country_code}>
                           <Box>
-                            <InlineStack align="space-between" blockAlign="center">
+                            <InlineStack
+                              align="space-between"
+                              blockAlign="center"
+                            >
                               <InlineStack gap="400" blockAlign="center">
                                 <div
                                   style={{
                                     width: "40px",
                                     height: "40px",
                                     borderRadius: "8px",
-                                    backgroundColor: item.list_type === 'whitelist' ? "#d4edda" : "#f8d7da",
+                                    backgroundColor:
+                                      item.list_type === "whitelist"
+                                        ? "#d4edda"
+                                        : "#f8d7da",
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
                                   }}
                                 >
-                                  <Icon source={LocationFilledIcon} tone="base" />
+                                  <Icon
+                                    source={LocationFilledIcon}
+                                    tone="base"
+                                  />
                                 </div>
                                 <BlockStack gap="100">
                                   <InlineStack gap="200" blockAlign="center">
-                                    <Text as="span" variant="bodyMd" fontWeight="semibold">
+                                    <Text
+                                      as="span"
+                                      variant="bodyMd"
+                                      fontWeight="semibold"
+                                    >
                                       {getCountryName(item.country_code)}
                                     </Text>
-                                    <Badge tone={item.list_type === 'whitelist' ? 'success' : 'critical'}>
+                                    <Badge
+                                      tone={
+                                        item.list_type === "whitelist"
+                                          ? "success"
+                                          : "critical"
+                                      }
+                                    >
                                       {item.list_type}
                                     </Badge>
                                   </InlineStack>
-                                  <Text as="span" variant="bodySm" tone="subdued">
-                                    Country code: {item.country_code}
+                                  <Text
+                                    as="span"
+                                    variant="bodySm"
+                                    tone="subdued"
+                                  >
+                                    Country code: <b>{item.country_code}</b>
                                   </Text>
                                   {item.redirect_url && (
-                                    <Text as="span" variant="bodySm" tone="subdued">
+                                    <Text
+                                      as="span"
+                                      variant="bodySm"
+                                      tone="subdued"
+                                    >
                                       Redirects to: {item.redirect_url}
                                     </Text>
                                   )}
-                                  <Text as="span" variant="bodySm" tone="subdued">
+                                  <Text
+                                    as="span"
+                                    variant="bodySm"
+                                    tone="subdued"
+                                  >
                                     Added on {formatDate(item.created_at)}
                                   </Text>
                                 </BlockStack>
@@ -589,7 +645,9 @@ export default function EnhancedCountryBlocker() {
                                 <Button
                                   variant="tertiary"
                                   tone="critical"
-                                  onClick={() => removeCountry(item.country_code)}
+                                  onClick={() =>
+                                    removeCountry(item.country_code)
+                                  }
                                   icon={DeleteIcon}
                                   accessibilityLabel="Remove country rule"
                                 >
@@ -611,27 +669,34 @@ export default function EnhancedCountryBlocker() {
           {/* Information Card */}
           <Layout.Section secondary>
             <Card>
-              <Box background="bg-surface-secondary" padding="400">
-                <BlockStack gap="200">
+              <BlockStack gap="200">
+                <InlineStack align="start" blockAlign="center" gap="200">
+                  <InlineStack>
+                    <Icon source={LockIcon} tone="base" />
+                  </InlineStack>
                   <Text as="h3" variant="headingSm">
                     How country rules work
                   </Text>
-                  <BlockStack gap="200">
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                      <strong>Blacklist:</strong> Blocks access from specified countries
-                    </Text>
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                      <strong>Whitelist:</strong> Allows access only from specified countries
-                    </Text>
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                      <strong>Redirects:</strong> Send blocked users to a custom URL instead of showing a block message
-                    </Text>
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                      <strong>Detection:</strong> Uses browser timezone and locale for country detection
-                    </Text>
-                  </BlockStack>
+                </InlineStack>
+                <BlockStack gap="200">
+                  <Text as="p" variant="bodyMd" tone="subdued">
+                    • <strong>Blacklist:</strong> Blocks access from specified
+                    countries
+                  </Text>
+                  <Text as="p" variant="bodyMd" tone="subdued">
+                    • <strong>Whitelist:</strong> Allows access only from
+                    specified countries
+                  </Text>
+                  <Text as="p" variant="bodyMd" tone="subdued">
+                    • <strong>Redirects:</strong> Send blocked users to a custom
+                    URL instead of showing a block message
+                  </Text>
+                  <Text as="p" variant="bodyMd" tone="subdued">
+                    • <strong>Detection:</strong> Uses browser timezone and
+                    locale for country detection
+                  </Text>
                 </BlockStack>
-              </Box>
+              </BlockStack>
             </Card>
           </Layout.Section>
         </Layout>

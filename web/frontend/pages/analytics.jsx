@@ -756,7 +756,7 @@ export default function Analytics() {
                     Current Visitors
                   </Text>
                   <Text variant="displayLarge" tone="success">
-                    {formatNumber(realtimeData?.stats?.current_visitors || 0)}
+                    {realtimeData?.stats?.current_visitors || 0}
                   </Text>
                   <Text variant="bodySm" tone="subdued">
                     Last 30 minutes
@@ -770,7 +770,7 @@ export default function Analytics() {
                     Unique Visitors
                   </Text>
                   <Text variant="displayLarge">
-                    {formatNumber(realtimeData?.stats?.unique_visitors || 0)}
+                    {realtimeData?.stats?.unique_visitors || 0}
                   </Text>
                   <Text variant="bodySm" tone="subdued">
                     Last 30 minutes
@@ -784,7 +784,7 @@ export default function Analytics() {
                     Bot Visits
                   </Text>
                   <Text variant="displayLarge" tone="warning">
-                    {formatNumber(realtimeData?.stats?.bot_visits || 0)}
+                    {realtimeData?.stats?.bot_visits || 0}
                   </Text>
                   <Text variant="bodySm" tone="subdued">
                     Last 30 minutes
@@ -798,7 +798,7 @@ export default function Analytics() {
                     Blocked Visits
                   </Text>
                   <Text variant="displayLarge" tone="critical">
-                    {formatNumber(realtimeData?.stats?.blocked_visits || 0)}
+                    {realtimeData?.stats?.blocked_visits || 0}
                   </Text>
                   <Text variant="bodySm" tone="subdued">
                     Last 30 minutes

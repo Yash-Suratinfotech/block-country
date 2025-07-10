@@ -441,6 +441,7 @@ router.get("/analytics/realtime", async (req, res) => {
         created_at
       FROM user_analytics 
       WHERE shop_domain = $1 
+        AND created_at >= NOW() - INTERVAL '30 minutes'
       ORDER BY created_at DESC
       LIMIT 10
     `,

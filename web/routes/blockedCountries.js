@@ -177,37 +177,6 @@ router.delete("/blocked-countries/:code", async (req, res) => {
   }
 });
 
-// Export countries to CSV
-router.get("/blocked-countries/export", async (req, res) => {
-  const shop = getShop(req);
-  const client = await db.getClient();
-
-  try {
-    const { rows } = await db.query(`
-      SELECT country_code, list_type, redirect_url, created_at 
-      FROM blocked_countries 
-      WHERE shop_domain = $1 
-      ORDER BY list_type DESC, country_code ASC
-    `, [shop]);
-
-    // Generate CSV
-    const csvHeader = 'Country Code,Rule Type,Redirect URL,Created At\n';
-    const csvData = rows.map(row => 
-      `"${row.country_code}","${row.list_type}","${row.redirect_url || ''}","${row.created_at}"`
-    ).join('\n');
-
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="country-rules-${shop}.csv"`);
-    res.send(csvHeader + csvData);
-
-  } catch (error) {
-    console.error("Error exporting countries:", error);
-    res.status(500).json({ error: "Failed to export countries" });
-  } finally {
-    client.release();
-  }
-});
-
 // Get country settings
 router.get("/country-settings", async (req, res) => {
   const shop = getShop(req);

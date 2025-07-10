@@ -10,7 +10,6 @@ I've successfully enhanced your existing country and IP blocker functionality to
 - **Blacklist Mode**: Block specific countries from accessing the store  
 - **Redirect URLs**: Send blocked users to custom pages instead of showing block messages
 - **Global Settings**: Set default behavior and redirect URLs for the entire shop
-- **Bulk Import/Export**: Manage multiple countries at once
 
 ### 🔒 Enhanced IP Management
 - **Whitelist Mode**: Only allow specific IP addresses to access the store
@@ -18,7 +17,6 @@ I've successfully enhanced your existing country and IP blocker functionality to
 - **Redirect URLs**: Send blocked users to custom pages instead of showing block messages
 - **Enhanced Notes**: Better context for why IPs were blocked/allowed
 - **Global Settings**: Set default behavior and auto-blocking thresholds
-- **Bulk Import/Export**: Manage multiple IPs at once
 
 ## 🎨 UI/UX Improvements
 
