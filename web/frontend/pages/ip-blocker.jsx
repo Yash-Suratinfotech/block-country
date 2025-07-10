@@ -23,6 +23,9 @@ import {
   ButtonGroup,
   Modal,
   Tabs,
+  SkeletonDisplayText,
+  SkeletonBodyText,
+  SkeletonThumbnail,
 } from "@shopify/polaris";
 import {
   DeleteIcon,
@@ -287,18 +290,6 @@ export default function EnhancedIPBlocker() {
     return { blacklistCount, whitelistCount };
   };
 
-  if (loading) {
-    return (
-      <Page title="IP Address Management">
-        <Card>
-          <div style={{ padding: "40px", textAlign: "center" }}>
-            <Spinner size="large" />
-          </div>
-        </Card>
-      </Page>
-    );
-  }
-
   const { blacklistCount, whitelistCount } = getListTypeStats();
 
   const modalMarkup = modalActive ? (
@@ -433,6 +424,51 @@ export default function EnhancedIPBlocker() {
     <Toast content={toastMessage} onDismiss={() => setToastActive(false)} />
   ) : null;
 
+  // Create a reusable skeleton row component
+  const SkeletonCountryRow = () => (
+    <Box>
+      <InlineStack align="space-between" blockAlign="center">
+        <InlineStack gap="400" blockAlign="center">
+          <div
+            style={{
+              width: "40px",
+              height: "40px",
+            }}
+          >
+            <SkeletonThumbnail size="small" />
+          </div>
+          <div
+            style={{
+              width: "200px",
+              borderRadius: "8px",
+            }}
+          >
+            <SkeletonBodyText lines={2} />
+          </div>
+        </InlineStack>
+        {/* Action buttons */}
+        <InlineStack gap="200" wrap="nowrap">
+          <div
+            style={{
+              width: "80px",
+              height: "30px",
+              borderRadius: "8px",
+              backgroundColor: "#f1f1f1",
+            }}
+          />
+          <div
+            style={{
+              width: "80px",
+              height: "30px",
+              borderRadius: "8px",
+              backgroundColor: "#f1f1f1",
+            }}
+          />
+        </InlineStack>
+      </InlineStack>
+    </Box>
+  );
+
   return (
     <Frame>
       <Page
@@ -454,44 +490,35 @@ export default function EnhancedIPBlocker() {
         <Layout>
           {/* Status Banner */}
           <Layout.Section>
-            <Banner
-              title={`IP Rules Active: ${blacklistCount} Blocked, ${whitelistCount} Allowed`}
-              tone={blockedIPs.length > 0 ? "info" : "warning"}
-            >
-              <p>
-                {whitelistCount > 0 && blacklistCount > 0
-                  ? "Mixed mode: Whitelist takes precedence over blacklist rules"
-                  : whitelistCount > 0
-                  ? "Whitelist mode: Only listed IP addresses can access your store"
-                  : blacklistCount > 0
-                  ? "Blacklist mode: Listed IP addresses are blocked from accessing your store"
-                  : "No IP rules configured"}
-              </p>
-            </Banner>
+            {loading ? (
+              <Card>
+                <BlockStack gap="400">
+                  <SkeletonDisplayText size="small" />
+                  <SkeletonBodyText lines={2} />
+                </BlockStack>
+              </Card>
+            ) : (
+              <Banner
+                title={`IP Rules Active: ${blacklistCount} Blocked, ${whitelistCount} Allowed`}
+                tone={blockedIPs.length > 0 ? "info" : "warning"}
+              >
+                <p>
+                  {whitelistCount > 0 && blacklistCount > 0
+                    ? "Mixed mode: Whitelist takes precedence over blacklist rules"
+                    : whitelistCount > 0
+                    ? "Whitelist mode: Only listed IP addresses can access your store"
+                    : blacklistCount > 0
+                    ? "Blacklist mode: Listed IP addresses are blocked from accessing your store"
+                    : "No IP rules configured"}
+                </p>
+              </Banner>
+            )}
           </Layout.Section>
 
           {/* IP Rules List */}
           <Layout.Section>
-            <Card>
+            <Card padding={0}>
               <BlockStack>
-                <Box
-                  paddingBlockStart="400"
-                  paddingBlockEnd="400"
-                  paddingInlineStart="500"
-                  paddingInlineEnd="500"
-                >
-                  <BlockStack gap="200">
-                    <Text as="h2" variant="headingMd">
-                      IP Address Rules
-                    </Text>
-                    <Text variant="bodyMd" tone="subdued">
-                      {filteredIPs.length === 0
-                        ? "No IP addresses configured for this rule type"
-                        : `${filteredIPs.length} IP addresses configured`}
-                    </Text>
-                  </BlockStack>
-                </Box>
-
                 <Tabs
                   tabs={tabs}
                   selected={selectedTab}
@@ -504,7 +531,16 @@ export default function EnhancedIPBlocker() {
                   paddingInlineStart="500"
                   paddingInlineEnd="500"
                 >
-                  {filteredIPs.length === 0 ? (
+                  {loading ? (
+                    <BlockStack gap="300">
+                      {[1, 2, 3].map((index) => (
+                        <React.Fragment key={index}>
+                          <SkeletonCountryRow />
+                          {index < 3 && <Divider />}
+                        </React.Fragment>
+                      ))}
+                    </BlockStack>
+                  ) : filteredIPs.length === 0 ? (
                     <EmptyState
                       heading={`No ${tabs[
                         selectedTab

@@ -3,7 +3,7 @@
 client_id = "7336a0b90ddf9a11935b69c5bd69a4c0"
 name = "Block Country"
 handle = "block-country-1"
-application_url = "https://feels-change-radius-words.trycloudflare.com"
+application_url = "https://front-farmer-prompt-edwards.trycloudflare.com"
 embedded = true
 
 [build]
@@ -18,10 +18,10 @@ api_version = "2025-04"
 scopes = ""
 
 [auth]
-redirect_urls = ["https://feels-change-radius-words.trycloudflare.com/auth/callback", "https://feels-change-radius-words.trycloudflare.com/auth/shopify/callback", "https://feels-change-radius-words.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://front-farmer-prompt-edwards.trycloudflare.com/auth/callback", "https://front-farmer-prompt-edwards.trycloudflare.com/auth/shopify/callback", "https://front-farmer-prompt-edwards.trycloudflare.com/api/auth/callback"]
 
 [app_proxy]
-url = "https://feels-change-radius-words.trycloudflare.com/data/info"
+url = "https://front-farmer-prompt-edwards.trycloudflare.com/data/info"
 subpath = "proxy"
 prefix = "apps"
 
